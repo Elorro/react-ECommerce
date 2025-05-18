@@ -10,7 +10,17 @@ export const SignInContainer = styled.div `
     }
 `
 
-export const ButtonsContainer = styled.div `
-    display: flexbox;
-    justify-content: space-between;
-`
+export const ButtonsContainer = styled.div`
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+
+  button {
+    flex: 0 1 auto;
+  }
+
+  @media (max-width: 768px) {
+    flex-direction: column;
+    gap: 10px;
+  }
+`;

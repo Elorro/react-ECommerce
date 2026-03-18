@@ -2,6 +2,12 @@
 
 set -euo pipefail
 
+if [[ -f ".env" ]]; then
+  set -a
+  source .env
+  set +a
+fi
+
 BASE_URL="${NEXT_PUBLIC_APP_URL:-${NEXTAUTH_URL:-}}"
 TOKEN="${INTERNAL_JOB_SECRET:-}"
 

@@ -4,9 +4,18 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const authMock = vi.fn();
 const updateOrderStatusMock = vi.fn();
+const orderFindUniqueMock = vi.fn();
 
 vi.mock("@/lib/auth", () => ({
   auth: authMock,
+}));
+
+vi.mock("@/lib/db", () => ({
+  db: {
+    order: {
+      findUnique: orderFindUniqueMock,
+    },
+  },
 }));
 
 vi.mock("@/lib/orders", () => ({
@@ -17,6 +26,13 @@ describe("api/admin/orders/[id] PATCH", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
+    orderFindUniqueMock.mockResolvedValue({
+      id: "ord_1",
+      status: "PAID",
+      paymentStatus: "PAID",
+      fulfilledAt: null,
+      canceledAt: null,
+    });
   });
 
   it("rejects non-admin users", async () => {

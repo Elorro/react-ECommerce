@@ -7,8 +7,8 @@ Base full-stack para un e-commerce moderno con `Next.js`, `TypeScript`, `Tailwin
 - Frontend y backend: Next.js App Router
 - Tipado: TypeScript estricto
 - Datos: Prisma
-- Desarrollo local inmediato: SQLite
-- Entorno más serio: PostgreSQL listo para usar
+- Base de datos activa: PostgreSQL
+- SQLite quedó relegado a la etapa anterior y ya no es la ruta principal
 - Auth delegada: NextAuth con Google y GitHub
 - Pagos: Stripe Checkout + webhook
 - Validación y sanitización: Zod + sanitize-html
@@ -22,8 +22,9 @@ Base full-stack para un e-commerce moderno con `Next.js`, `TypeScript`, `Tailwin
 - `npm run typecheck`: chequeo estricto de tipos
 - `npm run test`: tests
 - `npm run db:generate`: generar cliente Prisma para SQLite
-- `npm run db:push`: sincronizar esquema SQLite
-- `npm run db:seed`: poblar catálogo local
+- `npm run db:push`: sincronizar esquema PostgreSQL activa
+- `npm run db:migrate`: crear/aplicar migraciones sobre PostgreSQL activa
+- `npm run db:seed`: poblar catálogo local sobre PostgreSQL
 - `npm run db:generate:pg`: generar cliente Prisma usando esquema PostgreSQL
 - `npm run db:push:pg`: sincronizar esquema PostgreSQL
 - `npm run db:migrate:pg`: migraciones dev sobre PostgreSQL
@@ -35,6 +36,7 @@ Base full-stack para un e-commerce moderno con `Next.js`, `TypeScript`, `Tailwin
 Copia `.env.example` a `.env` y completa:
 
 - `DATABASE_URL`: SQLite local por defecto
+- `DATABASE_URL`: PostgreSQL activo del proyecto
 - `.env.production.example`: base recomendada para producción real
 - `NEXTAUTH_SECRET`: secreto real
 - `NEXTAUTH_URL`: URL base de la app
@@ -96,21 +98,21 @@ Scripts operativos añadidos:
 - `npm run ops:check:env`: valida variables mínimas de producción
 - `npm run ops:orders:reconcile`: ejecuta manualmente la reconciliación de órdenes pendientes
 
-Si quieres correr una base más cercana a producción:
+Setup local activo:
 
 1. levanta Postgres con `docker compose up -d`
 2. espera salud con `npm run ops:pg:wait`
-3. cambia `DATABASE_URL` por el valor de `DATABASE_URL_POSTGRES`
-4. ejecuta `npm run db:generate:pg`
-5. ejecuta `npm run db:push:pg`
-6. ejecuta `npm run db:seed:pg`
+3. verifica que `DATABASE_URL` apunte al valor PostgreSQL
+4. ejecuta `npm run db:generate`
+5. ejecuta `npm run db:migrate`
+6. ejecuta `npm run db:seed`
 
 Runbook mínimo de despliegue:
 
 1. valida env con `npm run ops:check:env`
 2. genera backup con `npm run ops:pg:backup`
-3. aplica `npm run db:generate:pg`
-4. aplica `npm run db:migrate:pg`
+3. aplica `npm run db:generate`
+4. aplica `npm run db:migrate`
 5. construye con `npm run build`
 6. verifica `GET /api/health` y `GET /api/readiness`
 7. si algo falla, restaura con `npm run ops:pg:restore -- .backups/<archivo>.dump`
@@ -123,6 +125,8 @@ Cron mínimo recomendado:
 
 La respuesta de `GET /api/health` también expone un bloque `readiness` con variables faltantes y la URL esperada del job interno.
 
+Los scripts `ops:pg:*` usan binarios locales de PostgreSQL si existen. Si no, hacen fallback al contenedor `atelier-commerce-postgres` por `docker exec`, que es la ruta local recomendada en este repo.
+
 `GET /api/readiness` devuelve `503` cuando la app no está lista para producción. En particular falla si:
 
 - falta un secreto o URL crítica
@@ -132,4 +136,4 @@ La respuesta de `GET /api/health` también expone un bloque `readiness` con vari
 - `NEXTAUTH_URL` y `NEXT_PUBLIC_APP_URL` no coinciden
 - `E2E_STRIPE_MODE=mock` sigue activo fuera de entorno local
 
-El proyecto sigue usando SQLite por defecto para no romper el setup local actual.
+El proyecto ya usa PostgreSQL como datasource principal.

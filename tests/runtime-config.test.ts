@@ -9,10 +9,10 @@ describe("runtime readiness", () => {
   });
 
   it("marks production as not ready when SQLite is used", () => {
-    Object.defineProperty(process.env, "NODE_ENV", {
-      value: "production",
-      configurable: true,
-    });
+    process.env = {
+      ...process.env,
+      NODE_ENV: "production",
+    };
     process.env.DATABASE_URL = "file:./prisma/dev.db";
     process.env.NEXTAUTH_SECRET = "secret";
     process.env.NEXTAUTH_URL = "https://shop.example.com";
@@ -30,10 +30,10 @@ describe("runtime readiness", () => {
   });
 
   it("marks production as ready with a consistent postgres setup", () => {
-    Object.defineProperty(process.env, "NODE_ENV", {
-      value: "production",
-      configurable: true,
-    });
+    process.env = {
+      ...process.env,
+      NODE_ENV: "production",
+    };
     process.env.DATABASE_URL = "postgresql://shop:pass@db.example.com:5432/shop?schema=public";
     process.env.DATABASE_URL_POSTGRES =
       "postgresql://shop:pass@db.example.com:5432/shop?schema=public";

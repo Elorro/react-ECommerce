@@ -19,48 +19,48 @@ export default async function HomePage() {
           </span>
           <div className="space-y-4">
             <h1 className="max-w-3xl font-display text-5xl leading-tight text-ink sm:text-6xl">
-              E-commerce moderno con arquitectura full-stack real.
+              Piezas con estilo para transformar tu espacio.
             </h1>
             <p className="max-w-2xl text-lg text-black/70">
-              Catálogo, checkout seguro, validación del lado servidor y una base técnica
-              preparada para crecer sin arrastrar la deuda del proyecto original.
+              Descubre una selección de productos pensados para elevar tu hogar con
+              diseño, calidad y una compra simple de principio a fin.
             </p>
           </div>
           <div className="flex flex-wrap gap-4">
             <Link
               href="/catalog"
-              className="inline-flex items-center gap-2 rounded-full bg-ink px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand"
+              className="inline-flex items-center gap-2 rounded-full bg-ink px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
             >
               Explorar catálogo
               <ArrowRight className="h-4 w-4" />
             </Link>
             <Link
               href="/account"
-              className="inline-flex items-center gap-2 rounded-full border border-ink/15 bg-white px-6 py-3 text-sm font-semibold text-ink transition hover:border-brand hover:text-brand"
+              className="inline-flex items-center gap-2 rounded-full border border-ink/15 bg-white px-6 py-3 text-sm font-semibold text-ink transition hover:border-brand hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
             >
-              Área de cliente
+              Ver mi cuenta
             </Link>
           </div>
         </div>
         <div className="grid gap-4 rounded-[1.5rem] bg-pine p-6 text-white">
           <div className="grid gap-3 rounded-3xl bg-white/10 p-5">
             <ShieldCheck className="h-8 w-8" />
-            <h2 className="font-display text-2xl">Seguridad desde la arquitectura</h2>
+            <h2 className="font-display text-2xl">Compra con tranquilidad</h2>
             <p className="text-white/80">
-              Sin claves sensibles en cliente, sin lógica crítica en frontend y con rutas
-              preparadas para validación estricta y rate limiting.
+              Tus pagos se procesan de forma segura y revisamos cada pedido para confirmar
+              disponibilidad y datos correctos antes de finalizarlo.
             </p>
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <FeatureCard
               icon={<ShoppingBag className="h-5 w-5" />}
-              title="Checkout real"
-              description="La base queda preparada para órdenes persistentes y pagos seguros."
+              title="Compra sin fricción"
+              description="Agrega tus favoritos, revisa tu carrito y completa tu compra en minutos."
             />
             <FeatureCard
               icon={<Zap className="h-5 w-5" />}
-              title="Base escalable"
-              description="Next.js, Prisma y tipado estricto para crecer sin improvisar."
+              title="Seleccion curada"
+              description="Encuentra productos destacados y colecciones listas para combinar."
             />
           </div>
         </div>
@@ -69,7 +69,7 @@ export default async function HomePage() {
       <FeaturedCategories categories={categories} />
       <ProductGrid
         title="Productos destacados"
-        eyebrow="Catálogo inicial"
+        eyebrow="Favoritos de la temporada"
         products={products}
       />
     </div>

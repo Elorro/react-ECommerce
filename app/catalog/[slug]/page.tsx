@@ -32,12 +32,20 @@ export default async function ProductDetailPage({
           <div className="flex flex-wrap items-end gap-6">
             <div>
               <p className="text-sm uppercase tracking-[0.2em] text-black/45">Precio</p>
-              <p className="text-4xl font-semibold">${product.price.toFixed(2)}</p>
+              <p className="text-5xl font-bold text-ink">${product.price.toFixed(2)}</p>
             </div>
             <div>
               <p className="text-sm uppercase tracking-[0.2em] text-black/45">Stock</p>
               <p className="text-lg font-medium">{product.stock} disponibles</p>
             </div>
+          </div>
+          <div className="flex flex-wrap gap-3 text-sm font-medium text-black/70">
+            <span className="rounded-full bg-emerald-50 px-4 py-2 text-emerald-800">
+              Compra segura
+            </span>
+            <span className="rounded-full bg-canvas px-4 py-2">
+              Envío y disponibilidad confirmados antes de finalizar
+            </span>
           </div>
           <AddToCartButton
             product={{

@@ -28,7 +28,7 @@ export function ProductGrid({
         {products.map((product) => (
           <article
             key={product.id}
-            className="overflow-hidden rounded-[1.75rem] border border-black/5 bg-white shadow-card"
+            className="overflow-hidden rounded-[1.75rem] border border-black/5 bg-white shadow-card transition hover:-translate-y-1 hover:shadow-xl"
           >
             <div className="relative aspect-square bg-sand/60">
               <Image
@@ -44,29 +44,31 @@ export function ProductGrid({
                 <p className="text-xs font-semibold uppercase tracking-[0.2em] text-brand">
                   {product.categoryName}
                 </p>
-                <div className="flex items-start justify-between gap-4">
+                <div className="space-y-3">
                   <h3 className="line-clamp-2 text-lg font-semibold">{product.name}</h3>
-                  <span className="whitespace-nowrap text-sm font-semibold">
+                  <span className="block whitespace-nowrap text-2xl font-bold text-ink">
                     ${product.price.toFixed(2)}
                   </span>
                 </div>
               </div>
-              <Link
-                href={`/catalog/${product.slug}`}
-                className="inline-flex rounded-full border border-ink/10 px-4 py-2 text-sm font-semibold transition hover:border-brand hover:text-brand"
-              >
-                Ver detalle
-              </Link>
-              <AddToCartButton
-                product={{
-                  id: product.id,
-                  slug: product.slug,
-                  name: product.name,
-                  imageUrl: product.imageUrl,
-                  price: product.price,
-                  stock: product.stock,
-                }}
-              />
+              <div className="flex flex-col gap-3">
+                <AddToCartButton
+                  product={{
+                    id: product.id,
+                    slug: product.slug,
+                    name: product.name,
+                    imageUrl: product.imageUrl,
+                    price: product.price,
+                    stock: product.stock,
+                  }}
+                />
+                <Link
+                  href={`/catalog/${product.slug}`}
+                  className="inline-flex justify-center rounded-full border border-ink/10 px-4 py-2 text-sm font-semibold text-ink/75 transition hover:border-brand hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+                >
+                  Ver detalles
+                </Link>
+              </div>
             </div>
           </article>
         ))}

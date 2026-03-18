@@ -56,3 +56,17 @@ export const createOrderNoteSchema = z.object({
 export const refundOrderSchema = z.object({
   reason: sanitizedString(5, 500),
 });
+
+export const manageReturnSchema = z.discriminatedUnion("action", [
+  z.object({
+    action: z.literal("REQUEST"),
+    reason: sanitizedString(5, 500),
+  }),
+  z.object({
+    action: z.literal("RECEIVE"),
+  }),
+  z.object({
+    action: z.literal("REFUND"),
+    reason: sanitizedString(5, 500),
+  }),
+]);

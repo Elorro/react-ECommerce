@@ -40,23 +40,56 @@ export default async function CheckoutSuccessPage({
       <span className="text-sm font-semibold uppercase tracking-[0.2em] text-brand">
         Pago confirmado
       </span>
-      <h1 className="font-display text-4xl">Stripe validó la sesión y la orden quedó finalizada</h1>
+      <h1 className="font-display text-4xl">Tu compra fue confirmada correctamente</h1>
       <p className="max-w-2xl text-black/70">
-        La confirmación se hizo del lado servidor. No se confió en el frontend ni en el total
-        enviado por el navegador.
+        Recibimos tu pago y tu pedido ya está registrado. Puedes revisar el detalle y seguir su estado cuando quieras.
       </p>
       <div className="rounded-3xl border border-black/5 bg-canvas px-5 py-4">
         <p className="font-semibold">{order.id}</p>
         <p className="text-sm text-black/55">
-          Estado: {order.status} · Pago: {order.paymentStatus}
+          Estado: {humanizeOrderStatus(order.status)} · Pago: {humanizePaymentStatus(order.paymentStatus)}
         </p>
       </div>
       <Link
         href={`/orders/${order.id}`}
-        className="inline-flex rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white"
+        className="inline-flex rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
       >
-        Ver orden
+        Ver mi pedido
       </Link>
     </section>
   );
+}
+
+function humanizeOrderStatus(status: string) {
+  switch (status) {
+    case "PENDING":
+      return "Pendiente";
+    case "PAID":
+      return "Confirmado";
+    case "PROCESSING":
+      return "En preparación";
+    case "FULFILLED":
+      return "Entregado";
+    case "CANCELED":
+      return "Cancelado";
+    default:
+      return status;
+  }
+}
+
+function humanizePaymentStatus(status: string) {
+  switch (status) {
+    case "UNPAID":
+      return "Sin pago";
+    case "REQUIRES_ACTION":
+      return "Pendiente";
+    case "PAID":
+      return "Pago recibido";
+    case "FAILED":
+      return "Pago no completado";
+    case "REFUNDED":
+      return "Reembolsado";
+    default:
+      return status;
+  }
 }

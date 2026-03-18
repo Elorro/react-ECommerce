@@ -40,8 +40,8 @@ export default async function CatalogPage({
         </span>
         <h1 className="font-display text-4xl">Todos los productos</h1>
         <p className="max-w-2xl text-black/70">
-          La fuente de verdad del catálogo ahora es la base de datos. El frontend solo
-          renderiza datos ya validados y preparados por el servidor.
+          Explora la colección completa, compara estilos y agrega tus favoritos al carrito
+          cuando encuentres la pieza ideal.
         </p>
       </div>
       <CatalogFilters

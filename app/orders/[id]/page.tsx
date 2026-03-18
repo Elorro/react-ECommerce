@@ -19,6 +19,7 @@ export default async function OrderDetailPage({
 
   const canViewSupportNotes = hasPermission(session.user.role, "orders.notes.manage");
   const canRefund = hasPermission(session.user.role, "orders.refund");
+  const canManageReturns = hasPermission(session.user.role, "orders.returns.manage");
   const [order, timeline, supportNotes] = await Promise.all([
     getOrderById(id, session.user.id, session.user.role),
     getOrderTimeline(id),
@@ -29,22 +30,23 @@ export default async function OrderDetailPage({
     notFound();
   }
 
+  const publicTimeline = timeline.map((event) => formatOrderEvent(event));
+
   return (
     <section className="space-y-8 rounded-[2rem] border border-black/5 bg-white/85 p-8 shadow-card">
       <div className="space-y-2">
         <span className="text-sm font-semibold uppercase tracking-[0.2em] text-brand">
-          Orden creada
+          Pedido confirmado
         </span>
         <h1 className="font-display text-4xl">Pedido {order.id}</h1>
         <p className="text-black/70">
-          El pedido fue persistido en base de datos y los totales fueron recalculados del
-          lado servidor. El frontend no tuvo autoridad sobre precios ni stock.
+          Aquí puedes revisar el estado de tu compra, los productos incluidos y cualquier actualización importante del pedido.
         </p>
       </div>
       <div className="grid gap-6 md:grid-cols-2">
         <InfoCard label="Cliente" value={`${order.customerName} · ${order.customerEmail}`} />
-        <InfoCard label="Estado" value={order.status} />
-        <InfoCard label="Pago" value={order.paymentStatus} />
+        <InfoCard label="Estado" value={humanizeOrderStatus(order.status)} />
+        <InfoCard label="Pago" value={humanizePaymentStatus(order.paymentStatus)} />
         <InfoCard label="Subtotal" value={`$${order.subtotalAmount.toFixed(2)}`} />
         <InfoCard label="Total" value={`$${order.totalAmount.toFixed(2)}`} />
       </div>
@@ -66,11 +68,11 @@ export default async function OrderDetailPage({
         </div>
       </div>
       <div className="space-y-4">
-        <h2 className="font-display text-3xl">Timeline operativo</h2>
+        <h2 className="font-display text-3xl">Estado del pedido</h2>
         <div className="grid gap-4">
-          {timeline.map((event) => (
+          {publicTimeline.map((event, index) => (
             <article
-              key={event.id}
+              key={`${event.title}-${index}`}
               className={`rounded-3xl border px-5 py-4 ${
                 event.tone === "error"
                   ? "border-red-200 bg-red-50"
@@ -88,11 +90,6 @@ export default async function OrderDetailPage({
                 </p>
               </div>
               <p className="mt-2 text-sm text-black/70">{event.description}</p>
-              {event.metadata ? (
-                <pre className="mt-3 overflow-x-auto rounded-2xl bg-ink p-4 text-xs text-white">
-                  {JSON.stringify(event.metadata, null, 2)}
-                </pre>
-              ) : null}
             </article>
           ))}
         </div>
@@ -108,8 +105,10 @@ export default async function OrderDetailPage({
               paymentStatus: order.paymentStatus,
             })
           }
+          canManageReturns={canManageReturns}
           status={order.status}
           paymentStatus={order.paymentStatus}
+          returnStatus={order.returnStatus}
         />
       ) : null}
     </section>
@@ -123,4 +122,135 @@ function InfoCard({ label, value }: { label: string; value: string }) {
       <p className="mt-2 text-lg font-medium">{value}</p>
     </div>
   );
+}
+
+function humanizeOrderStatus(status: string) {
+  switch (status) {
+    case "PENDING":
+      return "Pendiente";
+    case "PAID":
+      return "Confirmado";
+    case "PROCESSING":
+      return "En preparación";
+    case "FULFILLED":
+      return "Entregado";
+    case "CANCELED":
+      return "Cancelado";
+    default:
+      return status;
+  }
+}
+
+function humanizePaymentStatus(status: string) {
+  switch (status) {
+    case "UNPAID":
+      return "Sin pago";
+    case "REQUIRES_ACTION":
+      return "Pendiente";
+    case "PAID":
+      return "Pago recibido";
+    case "FAILED":
+      return "Pago no completado";
+    case "REFUNDED":
+      return "Reembolsado";
+    default:
+      return status;
+  }
+}
+
+function formatOrderEvent(event: {
+  title: string;
+  description: string;
+  tone: "info" | "warn" | "success" | "error";
+  createdAt: string;
+}) {
+  const normalizedTitle = event.title.toLowerCase();
+
+  if (normalizedTitle === "orden creada") {
+    return {
+      title: "Pedido confirmado",
+      description: "Recibimos tu pedido y lo estamos preparando para el siguiente paso.",
+      tone: event.tone,
+      createdAt: event.createdAt,
+    };
+  }
+
+  if (normalizedTitle === "pago reembolsado") {
+    return {
+      title: "Pago reembolsado",
+      description: "El reembolso fue procesado correctamente.",
+      tone: event.tone,
+      createdAt: event.createdAt,
+    };
+  }
+
+  if (normalizedTitle === "orden en preparación") {
+    return {
+      title: "Pedido en preparación",
+      description: "Tu pedido está siendo alistado para su entrega.",
+      tone: event.tone,
+      createdAt: event.createdAt,
+    };
+  }
+
+  if (normalizedTitle === "orden fulfilled") {
+    return {
+      title: "Pedido entregado",
+      description: "La entrega de tu pedido fue completada.",
+      tone: event.tone,
+      createdAt: event.createdAt,
+    };
+  }
+
+  if (normalizedTitle === "orden cancelada") {
+    return {
+      title: "Pedido cancelado",
+      description: "Este pedido fue cancelado antes de completarse.",
+      tone: event.tone,
+      createdAt: event.createdAt,
+    };
+  }
+
+  if (normalizedTitle === "pago pendiente") {
+    return {
+      title: "Pago pendiente",
+      description: "Estamos esperando la confirmación del pago para continuar.",
+      tone: event.tone,
+      createdAt: event.createdAt,
+    };
+  }
+
+  if (normalizedTitle === "devolución solicitada" || normalizedTitle === "devolucion solicitada") {
+    return {
+      title: "Devolución solicitada",
+      description: "Registramos tu solicitud de devolución y será revisada por el equipo.",
+      tone: event.tone,
+      createdAt: event.createdAt,
+    };
+  }
+
+  if (normalizedTitle === "devolución recibida" || normalizedTitle === "devolucion recibida") {
+    return {
+      title: "Devolución recibida",
+      description: "Recibimos el producto devuelto y avanzamos con la revisión final.",
+      tone: event.tone,
+      createdAt: event.createdAt,
+    };
+  }
+
+  if (normalizedTitle.startsWith("audit.admin.") || normalizedTitle.startsWith("admin.") || normalizedTitle.startsWith("orders.")) {
+    return {
+      title: "Actualización del pedido",
+      description: "Tu pedido recibió una actualización interna.",
+      tone: event.tone,
+      createdAt: event.createdAt,
+    };
+  }
+
+  return {
+    title: event.title,
+    description: event.description,
+    tone: event.tone,
+    createdAt: event.createdAt,
+  };
 }

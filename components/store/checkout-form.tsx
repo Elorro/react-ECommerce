@@ -19,6 +19,7 @@ export function CheckoutForm({
   const { data: session } = useSession();
   const { items, totalAmount, clearCart, isReady, isSyncing, source } = useCart();
   const [serverError, setServerError] = useState<string | null>(null);
+  const [isRedirectingToPayment, setIsRedirectingToPayment] = useState(false);
 
   const form = useForm<ClientCheckoutValues>({
     resolver: zodResolver(clientCheckoutSchema),
@@ -58,6 +59,7 @@ export function CheckoutForm({
 
   const onPayWithStripe = form.handleSubmit(async (values) => {
     setServerError(null);
+    setIsRedirectingToPayment(true);
 
     const response = await fetch("/api/payments/checkout-session", {
       method: "POST",
@@ -76,6 +78,7 @@ export function CheckoutForm({
     const data = (await response.json()) as { error?: string; checkoutUrl?: string };
 
     if (!response.ok || !data.checkoutUrl) {
+      setIsRedirectingToPayment(false);
       setServerError(data.error ?? "No se pudo iniciar el pago.");
       return;
     }
@@ -86,9 +89,9 @@ export function CheckoutForm({
   if (!isReady) {
     return (
       <section className="rounded-[2rem] border border-black/5 bg-white/85 p-8 shadow-card">
-        <h1 className="font-display text-4xl">Preparando checkout</h1>
+        <h1 className="font-display text-4xl">Preparando tu compra</h1>
         <p className="mt-3 max-w-xl text-black/70">
-          Estamos cargando el carrito {source === "user" ? "de tu cuenta" : "de este navegador"} antes de permitir el checkout.
+          Estamos cargando tu carrito {source === "user" ? "desde tu cuenta" : "desde este navegador"} para que puedas revisar tu pedido.
         </p>
       </section>
     );
@@ -97,10 +100,9 @@ export function CheckoutForm({
   if (!items.length) {
     return (
       <section className="rounded-[2rem] border border-black/5 bg-white/85 p-8 shadow-card">
-        <h1 className="font-display text-4xl">Checkout bloqueado</h1>
+        <h1 className="font-display text-4xl">Tu carrito está vacío</h1>
         <p className="mt-3 max-w-xl text-black/70">
-          No se puede crear una orden sin items. La validación del servidor además lo
-          rechaza aunque intentes enviar el payload manualmente.
+          Agrega al menos un producto antes de continuar al pago.
         </p>
       </section>
     );
@@ -111,9 +113,20 @@ export function CheckoutForm({
       <form onSubmit={onSubmit} className="space-y-5 rounded-[2rem] border border-black/5 bg-white/85 p-8 shadow-card">
         <div className="space-y-2">
           <span className="text-sm font-semibold uppercase tracking-[0.2em] text-brand">
-            Checkout seguro
+            Pago seguro
           </span>
-          <h1 className="font-display text-4xl">Datos de la orden</h1>
+          <h1 className="font-display text-4xl">Finaliza tu compra</h1>
+          <p className="max-w-xl text-black/70">
+            Revisa tus datos de entrega y completa tu pedido con total confianza.
+          </p>
+          <div className="flex flex-wrap gap-3 pt-2 text-sm font-medium text-black/70">
+            <span className="rounded-full bg-emerald-50 px-4 py-2 text-emerald-800">
+              Pago seguro procesado por Stripe
+            </span>
+            <span className="rounded-full bg-canvas px-4 py-2 text-black/75">
+              Tus datos están protegidos
+            </span>
+          </div>
         </div>
 
         <Field
@@ -122,7 +135,7 @@ export function CheckoutForm({
           input={
             <input
               {...form.register("customerName")}
-              className="mt-2 w-full rounded-2xl border border-black/10 bg-canvas px-4 py-3"
+              className="mt-2 w-full rounded-2xl border border-black/10 bg-canvas px-4 py-3 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
             />
           }
         />
@@ -140,7 +153,7 @@ export function CheckoutForm({
             <textarea
               rows={4}
               {...form.register("shippingAddress")}
-              className="mt-2 w-full rounded-2xl border border-black/10 bg-canvas px-4 py-3"
+              className="mt-2 w-full rounded-2xl border border-black/10 bg-canvas px-4 py-3 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
             />
           }
         />
@@ -152,39 +165,38 @@ export function CheckoutForm({
         ) : null}
         {paymentCancelled ? (
           <p className="rounded-2xl bg-amber-100 px-4 py-3 text-sm font-medium text-amber-900">
-            El pago fue cancelado antes de completarse. Tu carrito sigue intacto y puedes
-            reintentar cuando quieras.
+            El pago no se completó. Tu carrito sigue intacto para que puedas intentarlo de nuevo cuando quieras.
           </p>
         ) : null}
         {isSyncing ? (
           <p className="rounded-2xl bg-canvas px-4 py-3 text-sm font-medium text-black/70">
-            Esperando a que el carrito termine de sincronizarse antes de enviar la orden.
+            Estamos actualizando tu carrito antes de continuar.
           </p>
         ) : null}
 
-        <button
-          type="submit"
-          disabled={form.formState.isSubmitting || isSyncing}
-          className="inline-flex rounded-full bg-ink px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          {form.formState.isSubmitting ? "Creando orden..." : "Crear orden"}
-        </button>
         {stripeEnabled ? (
           <button
             type="button"
             onClick={onPayWithStripe}
-            disabled={form.formState.isSubmitting || isSyncing}
-            className="ml-3 inline-flex rounded-full border border-ink px-6 py-3 text-sm font-semibold text-ink transition hover:border-brand hover:text-brand disabled:cursor-not-allowed disabled:opacity-60"
+            disabled={form.formState.isSubmitting || isSyncing || isRedirectingToPayment}
+            className="inline-flex w-full items-center justify-center rounded-full bg-ink px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            Pagar con Stripe
+            {isRedirectingToPayment ? "Redirigiendo al pago..." : "Ir a pago seguro"}
           </button>
         ) : null}
+        <button
+          type="submit"
+          disabled={form.formState.isSubmitting || isSyncing || isRedirectingToPayment}
+          className="inline-flex w-full items-center justify-center rounded-full border border-ink/15 bg-white px-6 py-3 text-sm font-semibold text-ink transition hover:border-brand hover:text-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {form.formState.isSubmitting ? "Confirmando pedido..." : "Confirmar pedido"}
+        </button>
       </form>
 
-      <aside className="space-y-4 rounded-[2rem] border border-black/5 bg-pine p-8 text-white shadow-card">
-        <h2 className="font-display text-3xl">Resumen del servidor</h2>
+      <aside className="space-y-4 rounded-[2rem] border border-black/5 bg-pine p-8 text-white shadow-card lg:sticky lg:top-24 lg:self-start">
+        <h2 className="font-display text-3xl">Resumen de tu pedido</h2>
         <p className="text-white/75">
-          El backend recalcula precios, subtotales y valida stock real antes de persistir.
+          Revisa tus productos antes de pasar al pago.
         </p>
         <div className="space-y-3">
           {items.map((item) => (
@@ -198,10 +210,13 @@ export function CheckoutForm({
           ))}
         </div>
         <div className="border-t border-white/15 pt-4">
-          <div className="flex items-center justify-between text-lg font-semibold">
-            <span>Total estimado</span>
+          <div className="flex items-center justify-between text-xl font-semibold">
+            <span>Total</span>
             <span>${totalAmount.toFixed(2)}</span>
           </div>
+          <p className="mt-3 text-sm text-white/70">
+            Revisaremos tu pedido para confirmar precios y disponibilidad antes de finalizar la compra.
+          </p>
         </div>
       </aside>
     </div>

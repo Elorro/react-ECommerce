@@ -26,14 +26,12 @@ export default async function AccountPage() {
           {session.user.name ?? "Cliente"} · {session.user.email}
         </h1>
         <p className="max-w-2xl text-black/70">
-          Esta ruta ya está protegida por sesión. Las órdenes creadas desde checkout quedan
-          asociadas al usuario autenticado y solo se listan para su propia cuenta. El carrito
-          persistido también queda separado por usuario para que no herede items de otra sesión.
+          Aquí puedes revisar tus datos y seguir el estado de tus pedidos en un solo lugar.
         </p>
       </div>
 
       <div className="space-y-4">
-        <h2 className="font-display text-3xl">Mis órdenes</h2>
+        <h2 className="font-display text-3xl">Mis pedidos</h2>
         {orders.length ? (
           <div className="grid gap-4">
             {orders.map((order) => (
@@ -46,7 +44,7 @@ export default async function AccountPage() {
                   <div>
                     <p className="font-semibold">{order.id}</p>
                     <p className="text-sm text-black/55">
-                      {order.status} · {order.paymentStatus}
+                      {humanizeOrderStatus(order.status)} · {humanizePaymentStatus(order.paymentStatus)}
                     </p>
                   </div>
                   <p className="font-semibold">${order.totalAmount.toFixed(2)}</p>
@@ -55,9 +53,43 @@ export default async function AccountPage() {
             ))}
           </div>
         ) : (
-          <p className="text-black/65">Todavía no tienes órdenes registradas.</p>
+          <p className="text-black/65">Aún no tienes compras registradas.</p>
         )}
       </div>
     </section>
   );
+}
+
+function humanizeOrderStatus(status: string) {
+  switch (status) {
+    case "PENDING":
+      return "Pendiente";
+    case "PAID":
+      return "Confirmado";
+    case "PROCESSING":
+      return "En preparación";
+    case "FULFILLED":
+      return "Entregado";
+    case "CANCELED":
+      return "Cancelado";
+    default:
+      return status;
+  }
+}
+
+function humanizePaymentStatus(status: string) {
+  switch (status) {
+    case "UNPAID":
+      return "Sin pago";
+    case "REQUIRES_ACTION":
+      return "Pago pendiente";
+    case "PAID":
+      return "Pago recibido";
+    case "FAILED":
+      return "Pago no completado";
+    case "REFUNDED":
+      return "Reembolsado";
+    default:
+      return status;
+  }
 }

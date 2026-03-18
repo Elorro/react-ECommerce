@@ -21,21 +21,27 @@ export function OrderSupportPanel({
   orderId,
   initialNotes,
   canRefund,
+  canManageReturns,
   status,
   paymentStatus,
+  returnStatus,
 }: {
   orderId: string;
   initialNotes: SupportNote[];
   canRefund: boolean;
+  canManageReturns: boolean;
   status: string;
   paymentStatus: string;
+  returnStatus: string;
 }) {
   const router = useRouter();
   const [notes, setNotes] = useState(initialNotes);
   const [content, setContent] = useState("");
   const [refundReason, setRefundReason] = useState("");
+  const [returnReason, setReturnReason] = useState("");
   const [saving, setSaving] = useState(false);
   const [refunding, setRefunding] = useState(false);
+  const [managingReturn, setManagingReturn] = useState(false);
   const { pushToast } = useToast();
 
   const onSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
@@ -91,6 +97,53 @@ export function OrderSupportPanel({
     router.refresh();
   };
 
+  const onReturnAction = async (
+    event: React.FormEvent<HTMLFormElement>,
+    action: "REQUEST" | "RECEIVE" | "REFUND",
+  ) => {
+    event.preventDefault();
+    setManagingReturn(true);
+
+    const response = await fetch(`/api/admin/orders/${orderId}/return`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify(
+        action === "REQUEST"
+          ? {
+              action,
+              reason: returnReason,
+            }
+          : action === "REFUND"
+            ? {
+                action,
+                reason: refundReason,
+              }
+            : { action },
+      ),
+    });
+
+    setManagingReturn(false);
+
+    if (!response.ok) {
+      pushToast({ tone: "error", message: "No se pudo actualizar la devolución." });
+      return;
+    }
+
+    if (action === "REQUEST") {
+      setReturnReason("");
+      pushToast({ tone: "success", message: "Devolución solicitada." });
+    } else if (action === "RECEIVE") {
+      pushToast({ tone: "success", message: "Devolución recibida." });
+    } else {
+      setRefundReason("");
+      pushToast({ tone: "success", message: "Devolución reembolsada." });
+    }
+
+    router.refresh();
+  };
+
   return (
     <section className="space-y-4 rounded-[2rem] border border-black/5 bg-white/85 p-6 shadow-card">
       <div>
@@ -109,7 +162,7 @@ export function OrderSupportPanel({
           Accion comercial
         </p>
         <p className="mt-2 text-sm text-black/70">
-          Estado actual: {status} · Pago: {paymentStatus}
+          Estado actual: {status} · Pago: {paymentStatus} · Devolución: {returnStatus}
         </p>
         {canRefund ? (
           <form onSubmit={onRefund} className="mt-4 space-y-3">
@@ -122,7 +175,7 @@ export function OrderSupportPanel({
             />
             <button
               type="submit"
-              disabled={refunding || refundReason.trim().length < 5}
+              disabled={refunding || managingReturn || refundReason.trim().length < 5}
               className="rounded-full bg-red-600 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
             >
               {refunding ? "Procesando reembolso..." : "Reembolsar y cancelar orden"}
@@ -133,6 +186,60 @@ export function OrderSupportPanel({
             El reembolso solo se habilita para órdenes cobradas que aún no fueron fulfilled.
           </p>
         )}
+
+        {canManageReturns ? (
+          <div className="mt-4 space-y-3">
+            {returnStatus === "NONE" && status === "FULFILLED" && paymentStatus === "PAID" ? (
+              <form onSubmit={(event) => void onReturnAction(event, "REQUEST")} className="space-y-3">
+                <textarea
+                  value={returnReason}
+                  onChange={(event) => setReturnReason(event.target.value)}
+                  rows={3}
+                  placeholder="Motivo de la devolución posterior al fulfillment"
+                  className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3"
+                />
+                <button
+                  type="submit"
+                  disabled={managingReturn || returnReason.trim().length < 5}
+                  className="rounded-full bg-amber-600 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {managingReturn ? "Registrando..." : "Solicitar devolución"}
+                </button>
+              </form>
+            ) : null}
+
+            {returnStatus === "REQUESTED" ? (
+              <form onSubmit={(event) => void onReturnAction(event, "RECEIVE")}>
+                <button
+                  type="submit"
+                  disabled={managingReturn}
+                  className="rounded-full bg-brand px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {managingReturn ? "Actualizando..." : "Marcar devolución recibida"}
+                </button>
+              </form>
+            ) : null}
+
+            {returnStatus === "RECEIVED" && paymentStatus === "PAID" ? (
+              <form onSubmit={(event) => void onReturnAction(event, "REFUND")} className="space-y-3">
+                <textarea
+                  value={refundReason}
+                  onChange={(event) => setRefundReason(event.target.value)}
+                  rows={3}
+                  placeholder="Motivo del reembolso asociado a la devolución"
+                  className="w-full rounded-2xl border border-black/10 bg-white px-4 py-3"
+                />
+                <button
+                  type="submit"
+                  disabled={managingReturn || refundReason.trim().length < 5}
+                  className="rounded-full bg-emerald-700 px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {managingReturn ? "Procesando..." : "Reembolsar devolución"}
+                </button>
+              </form>
+            ) : null}
+          </div>
+        ) : null}
       </div>
 
       <form onSubmit={onSubmit} className="space-y-3">
@@ -145,7 +252,7 @@ export function OrderSupportPanel({
         />
         <button
           type="submit"
-          disabled={saving || refunding || content.trim().length < 3}
+          disabled={saving || refunding || managingReturn || content.trim().length < 3}
           className="rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white disabled:cursor-not-allowed disabled:opacity-60"
         >
           {saving ? "Guardando..." : "Guardar nota"}

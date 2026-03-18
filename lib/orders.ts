@@ -1,6 +1,12 @@
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { canRefundOrder, canTransitionOrderStatus } from "@/lib/order-status";
+import {
+  canReceiveReturn,
+  canRefundOrder,
+  canRefundReturn,
+  canRequestReturn,
+  canTransitionOrderStatus,
+} from "@/lib/order-status";
 import { getPendingPaymentExpiryDate, shouldExpirePendingOrder } from "@/lib/orders-lifecycle";
 import { getPagination } from "@/lib/pagination";
 import {
@@ -15,6 +21,7 @@ function serializeOrder(order: {
   id: string;
   status: string;
   paymentStatus: string;
+  returnStatus?: string;
   customerEmail: string;
   customerName: string;
   shippingAddress: string;
@@ -22,6 +29,8 @@ function serializeOrder(order: {
   totalAmount: Prisma.Decimal;
   processingStartedAt?: Date | null;
   refundedAt?: Date | null;
+  returnRequestedAt?: Date | null;
+  returnReceivedAt?: Date | null;
   items: Array<{
     id: string;
     quantity: number;
@@ -35,6 +44,8 @@ function serializeOrder(order: {
     totalAmount: Number(order.totalAmount),
     processingStartedAt: order.processingStartedAt?.toISOString() ?? null,
     refundedAt: order.refundedAt?.toISOString() ?? null,
+    returnRequestedAt: order.returnRequestedAt?.toISOString() ?? null,
+    returnReceivedAt: order.returnReceivedAt?.toISOString() ?? null,
     items: order.items.map((item) => ({
       id: item.id,
       quantity: item.quantity,
@@ -88,6 +99,9 @@ async function finalizePaidOrder(order: {
         paymentExpiresAt: null,
         processingStartedAt: null,
         refundedAt: null,
+        returnStatus: "NONE",
+        returnRequestedAt: null,
+        returnReceivedAt: null,
       },
       include: {
         items: {
@@ -186,6 +200,9 @@ export async function createOrder(
         status: "PAID",
         paymentStatus: "PAID",
         refundedAt: null,
+        returnStatus: "NONE",
+        returnRequestedAt: null,
+        returnReceivedAt: null,
         customerName: payload.customerName,
         customerEmail: context.userEmail,
         shippingAddress: payload.shippingAddress,
@@ -238,9 +255,12 @@ export async function createPendingStripeOrder(
       subtotalAmount: new Prisma.Decimal(subtotalAmount),
       totalAmount: new Prisma.Decimal(totalAmount),
       paymentStatus: "REQUIRES_ACTION",
+      returnStatus: "NONE",
       paymentProvider: "stripe",
       paymentExpiresAt: getPendingPaymentExpiryDate(),
       refundedAt: null,
+      returnRequestedAt: null,
+      returnReceivedAt: null,
       items: {
         create: normalizedItems.map((item) => ({
           productId: item.product.id,
@@ -336,6 +356,8 @@ export async function confirmStripeOrderPayment(params: {
         paymentStatus: "FAILED",
         canceledAt: new Date(),
         refundedAt: null,
+        returnRequestedAt: null,
+        returnReceivedAt: null,
       },
       include: {
         items: {
@@ -397,6 +419,8 @@ export async function confirmStripeOrderPaymentBySessionId(sessionId: string) {
         paymentStatus: "FAILED",
         canceledAt: new Date(),
         refundedAt: null,
+        returnRequestedAt: null,
+        returnReceivedAt: null,
       },
       include: {
         items: {
@@ -454,6 +478,8 @@ export async function failStripeOrderPaymentBySessionId(sessionId: string) {
       canceledAt: order.canceledAt ?? new Date(),
       refundedAt: null,
       paymentExpiresAt: null,
+      returnRequestedAt: null,
+      returnReceivedAt: null,
     },
     include: {
       items: {
@@ -512,11 +538,14 @@ export async function getOrderTimeline(orderId: string) {
         id: true,
         createdAt: true,
         paymentStatus: true,
+        returnStatus: true,
         paymentExpiresAt: true,
         processingStartedAt: true,
         fulfilledAt: true,
         canceledAt: true,
         refundedAt: true,
+        returnRequestedAt: true,
+        returnReceivedAt: true,
       },
     }),
     db.operationalLog.findMany({
@@ -596,6 +625,32 @@ export async function getOrderTimeline(orderId: string) {
     });
   }
 
+  if (order.returnRequestedAt) {
+    timeline.push({
+      id: `${order.id}:return_requested`,
+      tone: "warn",
+      title: "Devolución solicitada",
+      description: "Soporte registró una devolución posterior al fulfillment.",
+      createdAt: order.returnRequestedAt.toISOString(),
+      metadata: {
+        returnStatus: order.returnStatus,
+      },
+    });
+  }
+
+  if (order.returnReceivedAt) {
+    timeline.push({
+      id: `${order.id}:return_received`,
+      tone: "info",
+      title: "Devolución recibida",
+      description: "Operación confirmó recepción física de la devolución.",
+      createdAt: order.returnReceivedAt.toISOString(),
+      metadata: {
+        returnStatus: order.returnStatus,
+      },
+    });
+  }
+
   if (order.processingStartedAt) {
     timeline.push({
       id: `${order.id}:processing`,
@@ -625,10 +680,14 @@ export async function getOrderTimeline(orderId: string) {
       id: `${order.id}:refunded`,
       tone: "warn",
       title: "Pago reembolsado",
-      description: "La orden fue cancelada después del cobro y quedó reembolsada.",
+      description:
+        order.returnStatus === "REFUNDED"
+          ? "La orden fulfilled fue reembolsada después de una devolución."
+          : "La orden fue cancelada después del cobro y quedó reembolsada.",
       createdAt: order.refundedAt.toISOString(),
       metadata: {
         paymentStatus: order.paymentStatus,
+        returnStatus: order.returnStatus,
       },
     });
   }
@@ -722,6 +781,7 @@ export async function refundOrder(params: {
   orderId: string;
   actorUserId: string;
   reason: string;
+  mode?: "cancellation" | "return";
 }) {
   const order = await db.order.findUnique({
     where: {
@@ -741,12 +801,20 @@ export async function refundOrder(params: {
     throw new Error("Order not found.");
   }
 
-  if (
-    !canRefundOrder({
-      status: order.status,
-      paymentStatus: order.paymentStatus,
-    })
-  ) {
+  const mode = params.mode ?? "cancellation";
+  const isRefundAllowed =
+    mode === "return"
+      ? canRefundReturn({
+          status: order.status,
+          paymentStatus: order.paymentStatus,
+          returnStatus: order.returnStatus,
+        })
+      : canRefundOrder({
+          status: order.status,
+          paymentStatus: order.paymentStatus,
+        });
+
+  if (!isRefundAllowed) {
     throw new Error("Order is not refundable.");
   }
 
@@ -757,7 +825,10 @@ export async function refundOrder(params: {
     reason: params.reason,
   });
   const refundedAt = new Date();
-  const supportContent = `Reembolso registrado. Motivo: ${params.reason}`;
+  const supportContent =
+    mode === "return"
+      ? `Reembolso por devolución registrado. Motivo: ${params.reason}`
+      : `Reembolso registrado. Motivo: ${params.reason}`;
 
   return db.$transaction(async (tx) => {
     for (const item of order.items) {
@@ -778,11 +849,13 @@ export async function refundOrder(params: {
         id: order.id,
       },
       data: {
-        status: "CANCELED",
+        status: mode === "return" ? order.status : "CANCELED",
         paymentStatus: "REFUNDED",
-        canceledAt: order.canceledAt ?? refundedAt,
+        returnStatus: mode === "return" ? "REFUNDED" : order.returnStatus,
+        canceledAt: mode === "return" ? order.canceledAt : order.canceledAt ?? refundedAt,
         refundedAt,
         paymentExpiresAt: null,
+        returnReceivedAt: mode === "return" ? order.returnReceivedAt ?? refundedAt : order.returnReceivedAt,
       },
     });
 
@@ -799,6 +872,94 @@ export async function refundOrder(params: {
       noteId: note.id,
       refundMode: refund.mode,
       refundReferenceId: refund.referenceId,
+    };
+  });
+}
+
+export async function manageOrderReturn(params: {
+  orderId: string;
+  actorUserId: string;
+  action: "REQUEST" | "RECEIVE" | "REFUND";
+  reason?: string;
+}) {
+  const order = await db.order.findUnique({
+    where: {
+      id: params.orderId,
+    },
+    select: {
+      id: true,
+      status: true,
+      paymentStatus: true,
+      returnStatus: true,
+      returnRequestedAt: true,
+      returnReceivedAt: true,
+    },
+  });
+
+  if (!order) {
+    throw new Error("Order not found.");
+  }
+
+  if (
+    params.action === "REQUEST" &&
+    !canRequestReturn({
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+      returnStatus: order.returnStatus,
+    })
+  ) {
+    throw new Error("Order is not eligible for return request.");
+  }
+
+  if (params.action === "RECEIVE" && !canReceiveReturn({ returnStatus: order.returnStatus })) {
+    throw new Error("Order return cannot be marked as received.");
+  }
+
+  if (params.action === "REFUND") {
+    return refundOrder({
+      orderId: params.orderId,
+      actorUserId: params.actorUserId,
+      reason: params.reason ?? "Return refund",
+      mode: "return",
+    });
+  }
+
+  const now = new Date();
+  const content =
+    params.action === "REQUEST"
+      ? `Solicitud de devolución registrada. Motivo: ${params.reason}`
+      : "Devolución recibida en operación.";
+
+  return db.$transaction(async (tx) => {
+    const updatedOrder = await tx.order.update({
+      where: {
+        id: params.orderId,
+      },
+      data:
+        params.action === "REQUEST"
+          ? {
+              returnStatus: "REQUESTED",
+              returnRequestedAt: now,
+            }
+          : {
+              returnStatus: "RECEIVED",
+              returnReceivedAt: now,
+            },
+    });
+
+    const note = await tx.orderNote.create({
+      data: {
+        orderId: params.orderId,
+        authorUserId: params.actorUserId,
+        content,
+      },
+    });
+
+    return {
+      order: updatedOrder,
+      noteId: note.id,
+      refundMode: null,
+      refundReferenceId: null,
     };
   });
 }
@@ -1067,6 +1228,8 @@ export async function expireStalePendingOrders(now = new Date()) {
       paymentStatus: "FAILED",
       canceledAt: now,
       refundedAt: null,
+      returnRequestedAt: null,
+      returnReceivedAt: null,
     },
   });
 

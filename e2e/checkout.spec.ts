@@ -70,7 +70,7 @@ test("authenticated customer can reach checkout", async ({ page }) => {
   await seedAuthenticatedCartByEmail(page, email, [{ slug: "brown-cowboy", quantity: 1 }]);
 
   await page.goto("/checkout");
-  await expect(page.getByRole("heading", { name: "Datos de la orden" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Finaliza tu compra" })).toBeVisible();
   await expect(page.getByText(/Correo autenticado/i)).toBeVisible();
 });
 
@@ -87,18 +87,18 @@ test("authenticated customer can complete mocked stripe checkout", async ({ page
   await page.goto("/checkout");
   await page.getByLabel("Nombre completo").fill("Comprador E2E");
   await page.getByLabel("Direccion de envio").fill("Calle 123, Bogota");
-  await page.getByRole("button", { name: "Pagar con Stripe" }).click();
+  await page.getByRole("button", { name: "Ir a pago seguro" }).click();
 
   await page.waitForURL("**/checkout/success**");
   await expect(
     page.getByRole("heading", {
-      name: "Stripe validó la sesión y la orden quedó finalizada",
+      name: "Tu compra fue confirmada correctamente",
     }),
   ).toBeVisible();
-  await page.getByRole("link", { name: "Ver orden" }).click();
+  await page.getByRole("link", { name: "Ver mi pedido" }).click();
   await page.waitForURL("**/orders/**");
-  await expect(page.getByText(/^Pedido /)).toBeVisible();
-  await expect(page.getByText("PAID")).toHaveCount(2);
+  await expect(page.getByRole("heading", { name: /^Pedido / })).toBeVisible();
+  await expect(page.getByText("Pago recibido")).toHaveCount(1);
 });
 
 test("checkout shows cancelled payment notice when returning from Stripe", async ({ page }) => {
@@ -112,6 +112,5 @@ test("checkout shows cancelled payment notice when returning from Stripe", async
   await seedAuthenticatedCartByEmail(page, email, [{ slug: "brown-cowboy", quantity: 1 }]);
 
   await page.goto("/checkout?payment=cancelled");
-  await expect(page.getByRole("heading", { name: "Datos de la orden" })).toBeVisible();
-  await expect(page.getByText(/El pago fue cancelado antes de completarse/i)).toBeVisible();
+  await expect(page.getByText(/El pago no se completó/i)).toBeVisible();
 });

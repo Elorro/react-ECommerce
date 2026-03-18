@@ -1,5 +1,6 @@
 export type OrderStatusValue = "PENDING" | "PAID" | "PROCESSING" | "FULFILLED" | "CANCELED";
 export type PaymentStatusValue = "UNPAID" | "REQUIRES_ACTION" | "PAID" | "FAILED" | "REFUNDED";
+export type ReturnStatusValue = "NONE" | "REQUESTED" | "RECEIVED" | "REFUNDED";
 
 export function getAllowedOrderStatusTransitions(input: {
   status: OrderStatusValue;
@@ -41,5 +42,35 @@ export function canRefundOrder(input: {
 }) {
   return (
     input.paymentStatus === "PAID" && (input.status === "PAID" || input.status === "PROCESSING")
+  );
+}
+
+export function canRequestReturn(input: {
+  status: OrderStatusValue;
+  paymentStatus: PaymentStatusValue;
+  returnStatus: ReturnStatusValue;
+}) {
+  return (
+    input.status === "FULFILLED" &&
+    input.paymentStatus === "PAID" &&
+    input.returnStatus === "NONE"
+  );
+}
+
+export function canReceiveReturn(input: {
+  returnStatus: ReturnStatusValue;
+}) {
+  return input.returnStatus === "REQUESTED";
+}
+
+export function canRefundReturn(input: {
+  status: OrderStatusValue;
+  paymentStatus: PaymentStatusValue;
+  returnStatus: ReturnStatusValue;
+}) {
+  return (
+    input.status === "FULFILLED" &&
+    input.paymentStatus === "PAID" &&
+    input.returnStatus === "RECEIVED"
   );
 }

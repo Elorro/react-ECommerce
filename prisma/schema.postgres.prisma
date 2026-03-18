@@ -116,6 +116,7 @@ model Order {
   userId           String?
   status           OrderStatus   @default(PENDING)
   paymentStatus    PaymentStatus @default(UNPAID)
+  returnStatus     ReturnStatus  @default(NONE)
   paymentProvider  String?
   paymentSessionId String?       @unique
   paymentExpiresAt DateTime?
@@ -123,6 +124,8 @@ model Order {
   fulfilledAt      DateTime?
   canceledAt       DateTime?
   refundedAt       DateTime?
+  returnRequestedAt DateTime?
+  returnReceivedAt DateTime?
   currency         String        @default("USD")
   subtotalAmount   Decimal
   totalAmount      Decimal
@@ -210,6 +213,13 @@ enum PaymentStatus {
   REQUIRES_ACTION
   PAID
   FAILED
+  REFUNDED
+}
+
+enum ReturnStatus {
+  NONE
+  REQUESTED
+  RECEIVED
   REFUNDED
 }
 

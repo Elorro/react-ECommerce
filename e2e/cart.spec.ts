@@ -110,5 +110,5 @@ test("anonymous cart merges into the first authenticated account and stays isola
   });
 
   await page.goto("/cart");
-  await expect(page.getByText("Carrito vacio")).toBeVisible();
+  await expect(page.getByText("Tu carrito está vacío")).toBeVisible();
 });

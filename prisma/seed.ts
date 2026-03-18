@@ -4,6 +4,8 @@ import { seedCategories } from "../lib/shop-data";
 const prisma = new PrismaClient();
 
 async function main() {
+  await prisma.cartItem.deleteMany();
+  await prisma.cart.deleteMany();
   await prisma.orderItem.deleteMany();
   await prisma.order.deleteMany();
   await prisma.product.deleteMany();

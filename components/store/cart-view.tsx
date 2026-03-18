@@ -9,9 +9,9 @@ export function CartView() {
   if (!isReady) {
     return (
       <section className="rounded-[2rem] border border-black/5 bg-white/85 p-8 shadow-card">
-        <h1 className="font-display text-4xl">Sincronizando carrito</h1>
+        <h1 className="font-display text-4xl">Preparando tu carrito</h1>
         <p className="mt-3 max-w-xl text-black/70">
-          Estamos cargando el carrito {source === "user" ? "de tu cuenta" : "de este navegador"} para evitar mezclar estados viejos.
+          Estamos cargando los productos {source === "user" ? "de tu cuenta" : "de este navegador"} para que puedas continuar tu compra.
         </p>
       </section>
     );
@@ -20,16 +20,15 @@ export function CartView() {
   if (!items.length) {
     return (
       <section className="rounded-[2rem] border border-black/5 bg-white/85 p-8 shadow-card">
-        <h1 className="font-display text-4xl">Carrito vacio</h1>
+        <h1 className="font-display text-4xl">Tu carrito está vacío</h1>
         <p className="mt-3 max-w-xl text-black/70">
-          Todavía no agregaste productos. El carrito anónimo se conserva en este navegador y
-          el carrito autenticado se aísla por cuenta para no mezclar sesiones distintas.
+          Aún no agregaste productos. Explora el catálogo y guarda tus favoritos para comprar cuando quieras.
         </p>
         <Link
           href="/catalog"
-          className="mt-6 inline-flex rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white"
+          className="mt-6 inline-flex rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
         >
-          Ir al catalogo
+          Explorar catálogo
         </Link>
       </section>
     );
@@ -42,16 +41,16 @@ export function CartView() {
           <span className="text-sm font-semibold uppercase tracking-[0.2em] text-brand">
             Carrito
           </span>
-          <h1 className="font-display text-4xl">Resumen previo al checkout</h1>
+          <h1 className="font-display text-4xl">Tu carrito</h1>
         </div>
-        <div className="text-right">
+        <div className="rounded-3xl bg-white px-5 py-4 text-right shadow-card">
           <p className="text-sm uppercase tracking-[0.2em] text-black/45">Total</p>
-          <p className="text-3xl font-semibold">${totalAmount.toFixed(2)}</p>
+          <p className="text-4xl font-bold text-ink">${totalAmount.toFixed(2)}</p>
         </div>
       </div>
       {isSyncing ? (
         <p className="rounded-2xl bg-amber-100 px-4 py-3 text-sm font-medium text-amber-900">
-          Guardando cambios del carrito en segundo plano.
+          Actualizando tu carrito...
         </p>
       ) : null}
 
@@ -80,14 +79,14 @@ export function CartView() {
                   disabled={isSyncing}
                   value={item.quantity}
                   onChange={(event) => updateQuantity(item.id, Number(event.target.value))}
-                  className="mt-2 w-24 rounded-2xl border border-black/10 bg-canvas px-3 py-2 disabled:cursor-not-allowed disabled:opacity-60"
+                  className="mt-2 w-24 rounded-2xl border border-black/10 bg-canvas px-3 py-2 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
                 />
               </label>
               <button
                 type="button"
                 disabled={isSyncing}
                 onClick={() => removeItem(item.id)}
-                className="text-sm font-semibold text-brand disabled:cursor-not-allowed disabled:opacity-60"
+                className="rounded-full border border-transparent px-3 py-2 text-sm font-semibold text-brand transition hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 Eliminar
               </button>
@@ -98,11 +97,11 @@ export function CartView() {
 
       <Link
         href="/checkout"
-        className={`inline-flex rounded-full px-6 py-3 text-sm font-semibold text-white transition ${
+        className={`inline-flex rounded-full px-6 py-3 text-sm font-semibold text-white transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 ${
           isSyncing ? "pointer-events-none bg-black/35" : "bg-ink hover:bg-brand"
         }`}
       >
-        Continuar al checkout
+        Ir a pago
       </Link>
     </section>
   );

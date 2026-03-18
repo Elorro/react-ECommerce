@@ -38,10 +38,26 @@ export default async function AdminDashboardPage() {
       </div>
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label="Productos" value={catalog.products} detail={`${catalog.activeProducts} activos`} />
-        <MetricCard label="Categorías" value={catalog.categories} detail={`${catalog.featuredProducts} destacados`} />
-        <MetricCard label="Órdenes" value={orders.totalOrders} detail={`${orders.pendingOrders} pendientes`} />
-        <MetricCard label="Revenue pagado" value={`$${orders.paidRevenue.toFixed(2)}`} detail={`${orders.fulfilledOrders} fulfillment`} />
+        <MetricCard
+          label="Productos"
+          value={catalog.products}
+          detail={`${catalog.activeProducts} activos`}
+        />
+        <MetricCard
+          label="Categorías"
+          value={catalog.categories}
+          detail={`${catalog.featuredProducts} destacados`}
+        />
+        <MetricCard
+          label="Órdenes"
+          value={orders.totalOrders}
+          detail={`${orders.pendingOrders} pendientes`}
+        />
+        <MetricCard
+          label="Revenue pagado"
+          value={`$${orders.paidRevenue.toFixed(2)}`}
+          detail={`${orders.fulfilledOrders} fulfillment`}
+        />
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
@@ -144,42 +160,28 @@ export default async function AdminDashboardPage() {
 
       <div className="flex flex-wrap gap-3">
         {hasPermission(session.user.role, "catalog.products.view") ? (
-          <>
-            <QuickLink href="/admin/products" label="Gestionar productos" />
-          </>
+          <QuickLink href="/admin/products" label="Gestionar productos" />
         ) : null}
         {hasPermission(session.user.role, "catalog.categories.view") ? (
-          <>
-            <QuickLink href="/admin/categories" label="Gestionar categorías" />
-          </>
+          <QuickLink href="/admin/categories" label="Gestionar categorías" />
         ) : null}
         {hasPermission(session.user.role, "exports.products") ? (
-          <>
-            <QuickLink href="/api/admin/export/products" label="Exportar productos CSV" />
-          </>
+          <QuickLink href="/api/admin/export/products" label="Exportar productos CSV" />
         ) : null}
         {hasPermission(session.user.role, "exports.categories") ? (
-          <>
-            <QuickLink href="/api/admin/export/categories" label="Exportar categorías CSV" />
-          </>
+          <QuickLink href="/api/admin/export/categories" label="Exportar categorías CSV" />
         ) : null}
         {hasPermission(session.user.role, "orders.view") ? (
-          <>
-            <QuickLink href="/admin/orders" label="Revisar órdenes" />
-          </>
+          <QuickLink href="/admin/orders" label="Revisar órdenes" />
         ) : null}
         {hasPermission(session.user.role, "exports.orders") ? (
-          <>
-            <QuickLink href="/api/admin/export/orders" label="Exportar órdenes CSV" />
-          </>
+          <QuickLink href="/api/admin/export/orders" label="Exportar órdenes CSV" />
         ) : null}
         {hasPermission(session.user.role, "observability.view") ? (
           <QuickLink href="/admin/observability" label="Ver observabilidad" />
         ) : null}
         {hasPermission(session.user.role, "exports.logs") ? (
-          <>
-            <QuickLink href="/api/admin/export/logs" label="Exportar logs CSV" />
-          </>
+          <QuickLink href="/api/admin/export/logs" label="Exportar logs CSV" />
         ) : null}
       </div>
     </section>

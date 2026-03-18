@@ -40,7 +40,7 @@ describe("AdminProductsTable", () => {
           categories={[{ id: "cat_1", name: "Outerwear" }]}
           filters={{ totalItems: 1 }}
         />
-      </ToastProvider>,
+      </ToastProvider>
     );
 
     fireEvent.click(screen.getByLabelText("Seleccionar todos los productos visibles"));

@@ -35,7 +35,7 @@ describe("AdminOrdersTable", () => {
           ]}
           filters={{ totalItems: 1 }}
         />
-      </ToastProvider>,
+      </ToastProvider>
     );
 
     fireEvent.click(screen.getByText("Marcar pagadas"));

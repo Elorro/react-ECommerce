@@ -1,70 +1,124 @@
-# Getting Started with Create React App
+# Atelier Commerce
 
-This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
+Base full-stack para un e-commerce moderno con `Next.js`, `TypeScript`, `Tailwind`, `Prisma`, `NextAuth`, `Stripe`, validación con `Zod` y testing con `Vitest`.
 
-## Available Scripts
+## Stack actual
 
-In the project directory, you can run:
+- Frontend y backend: Next.js App Router
+- Tipado: TypeScript estricto
+- Datos: Prisma
+- Desarrollo local inmediato: SQLite
+- Entorno más serio: PostgreSQL listo para usar
+- Auth delegada: NextAuth con Google y GitHub
+- Pagos: Stripe Checkout + webhook
+- Validación y sanitización: Zod + sanitize-html
 
-### `npm start`
+## Scripts
 
-Runs the app in the development mode.\
-Open [http://localhost:3000](http://localhost:3000) to view it in your browser.
+- `npm run dev`: entorno local
+- `npm run build`: build de producción
+- `npm run start`: servir build
+- `npm run lint`: ESLint CLI
+- `npm run typecheck`: chequeo estricto de tipos
+- `npm run test`: tests
+- `npm run db:generate`: generar cliente Prisma para SQLite
+- `npm run db:push`: sincronizar esquema SQLite
+- `npm run db:seed`: poblar catálogo local
+- `npm run db:generate:pg`: generar cliente Prisma usando esquema PostgreSQL
+- `npm run db:push:pg`: sincronizar esquema PostgreSQL
+- `npm run db:migrate:pg`: migraciones dev sobre PostgreSQL
+- `npm run db:seed:pg`: poblar PostgreSQL
 
-The page will reload when you make changes.\
-You may also see any lint errors in the console.
+## Variables de entorno
 
-### `npm test`
+Copia `.env.example` a `.env` y completa:
 
-Launches the test runner in the interactive watch mode.\
-See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
+- `DATABASE_URL`: SQLite local por defecto
+- `NEXTAUTH_SECRET`: secreto real
+- `NEXTAUTH_URL`: URL base de la app
+- `AUTH_GOOGLE_ID` y `AUTH_GOOGLE_SECRET`: OAuth Google
+- `ADMIN_EMAILS`: correos con rol admin separados por coma
+- `STRIPE_SECRET_KEY`: clave privada Stripe
+- `STRIPE_WEBHOOK_SECRET`: firma del webhook
+- `INTERNAL_JOB_SECRET`: token bearer para el endpoint interno de reconciliación
+- `NEXT_PUBLIC_APP_URL`: URL pública usada por Stripe
 
-### `npm run build`
+## Auth
 
-Builds the app for production to the `build` folder.\
-It correctly bundles React in production mode and optimizes the build for the best performance.
+No hay formulario manual de registro. El flujo es deliberado:
 
-The build is minified and the filenames include the hashes.\
-Your app is ready to be deployed!
+- el usuario entra con OAuth;
+- la cuenta se crea automáticamente en el primer acceso;
+- en accesos siguientes solo inicia sesión.
 
-See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
+Eso reduce superficie de ataque y evita gestionar contraseñas propias.
 
-### `npm run eject`
+## Admin
 
-**Note: this is a one-way operation. Once you `eject`, you can't go back!**
+Los accesos admin solo aparecen para usuarios autenticados con rol `ADMIN`.
 
-If you aren't satisfied with the build tool and configuration choices, you can `eject` at any time. This command will remove the single build dependency from your project.
+Rutas principales:
 
-Instead, it will copy all the configuration files and the transitive dependencies (webpack, Babel, ESLint, etc) right into your project so you have full control over them. All of the commands except `eject` will still work, but they will point to the copied scripts so you can tweak them. At this point you're on your own.
+- `/admin/products`
+- `/admin/categories`
+- `/admin/orders`
 
-You don't have to ever use `eject`. The curated feature set is suitable for small and middle deployments, and you shouldn't feel obligated to use this feature. However we understand that this tool wouldn't be useful if you couldn't customize it when you are ready for it.
+## Soporte operativo
 
-## Learn More
+- `/orders/[id]` ahora incluye timeline operativo del pedido
+- `/admin/observability` agrupa errores y muestra auditoría admin reciente
+- `GET /api/admin/export/orders` exporta timestamps operativos, estado de pago y dirección
+- `GET /api/admin/export/logs?orderId=<id>` permite exportar eventos de una orden concreta
 
-You can learn more in the [Create React App documentation](https://facebook.github.io/create-react-app/docs/getting-started).
+## Pagos y reconciliación
 
-To learn React, check out the [React documentation](https://reactjs.org/).
+El checkout con Stripe crea una orden pendiente y la confirma por dos vías:
 
-### Code Splitting
+- retorno del checkout en `/checkout/success`
+- webhook `POST /api/payments/webhook`
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/code-splitting](https://facebook.github.io/create-react-app/docs/code-splitting)
+Además existe un endpoint interno para expirar órdenes pendientes vencidas:
 
-### Analyzing the Bundle Size
+- `POST /api/internal/orders/reconcile`
+- Header requerido: `Authorization: Bearer <INTERNAL_JOB_SECRET>`
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size](https://facebook.github.io/create-react-app/docs/analyzing-the-bundle-size)
+Ese endpoint está pensado para un cron externo.
 
-### Making a Progressive Web App
+## PostgreSQL local y producción
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app](https://facebook.github.io/create-react-app/docs/making-a-progressive-web-app)
+Scripts operativos añadidos:
 
-### Advanced Configuration
+- `npm run ops:pg:wait`: espera a que Postgres acepte conexiones
+- `npm run ops:pg:backup`: genera backup `.dump`
+- `npm run ops:pg:restore -- <archivo>`: restaura un backup
+- `npm run ops:check:env`: valida variables mínimas de producción
+- `npm run ops:orders:reconcile`: ejecuta manualmente la reconciliación de órdenes pendientes
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/advanced-configuration](https://facebook.github.io/create-react-app/docs/advanced-configuration)
+Si quieres correr una base más cercana a producción:
 
-### Deployment
+1. levanta Postgres con `docker compose up -d`
+2. espera salud con `npm run ops:pg:wait`
+3. cambia `DATABASE_URL` por el valor de `DATABASE_URL_POSTGRES`
+4. ejecuta `npm run db:generate:pg`
+5. ejecuta `npm run db:push:pg`
+6. ejecuta `npm run db:seed:pg`
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/deployment](https://facebook.github.io/create-react-app/docs/deployment)
+Runbook mínimo de despliegue:
 
-### `npm run build` fails to minify
+1. valida env con `npm run ops:check:env`
+2. genera backup con `npm run ops:pg:backup`
+3. aplica `npm run db:generate:pg`
+4. aplica `npm run db:migrate:pg`
+5. construye con `npm run build`
+6. verifica `GET /api/health`
+7. si algo falla, restaura con `npm run ops:pg:restore -- .backups/<archivo>.dump`
 
-This section has moved here: [https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify](https://facebook.github.io/create-react-app/docs/troubleshooting#npm-run-build-fails-to-minify)
+Cron mínimo recomendado:
+
+- ejecuta `npm run ops:orders:reconcile` cada 5 minutos
+- ese script llama `POST /api/internal/orders/reconcile`
+- necesita `INTERNAL_JOB_SECRET` y `NEXT_PUBLIC_APP_URL` o `NEXTAUTH_URL`
+
+La respuesta de `GET /api/health` también expone un bloque `readiness` con variables faltantes y la URL esperada del job interno.
+
+El proyecto sigue usando SQLite por defecto para no romper el setup local actual.

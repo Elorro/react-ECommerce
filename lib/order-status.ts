@@ -34,3 +34,12 @@ export function canTransitionOrderStatus(input: {
     paymentStatus: input.paymentStatus,
   }).includes(input.nextStatus);
 }
+
+export function canRefundOrder(input: {
+  status: OrderStatusValue;
+  paymentStatus: PaymentStatusValue;
+}) {
+  return (
+    input.paymentStatus === "PAID" && (input.status === "PAID" || input.status === "PROCESSING")
+  );
+}

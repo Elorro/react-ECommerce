@@ -11,6 +11,7 @@ export type Permission =
   | "orders.view"
   | "orders.update"
   | "orders.bulk_update"
+  | "orders.refund"
   | "orders.notes.manage"
   | "observability.view"
   | "exports.products"
@@ -25,6 +26,7 @@ const rolePermissions: Record<AppRole, Permission[]> = {
     "orders.view",
     "orders.update",
     "orders.bulk_update",
+    "orders.refund",
     "orders.notes.manage",
     "observability.view",
     "exports.orders",
@@ -39,6 +41,7 @@ const rolePermissions: Record<AppRole, Permission[]> = {
     "orders.view",
     "orders.update",
     "orders.bulk_update",
+    "orders.refund",
     "orders.notes.manage",
     "observability.view",
     "exports.products",

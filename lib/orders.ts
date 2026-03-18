@@ -1,9 +1,14 @@
 import { Prisma } from "@prisma/client";
 import { db } from "@/lib/db";
-import { canTransitionOrderStatus } from "@/lib/order-status";
+import { canRefundOrder, canTransitionOrderStatus } from "@/lib/order-status";
 import { getPendingPaymentExpiryDate, shouldExpirePendingOrder } from "@/lib/orders-lifecycle";
 import { getPagination } from "@/lib/pagination";
-import { getAppUrl, getStripe, isStripeMockEnabled } from "@/lib/payments";
+import {
+  getAppUrl,
+  getStripe,
+  isStripeMockEnabled,
+  refundCheckoutSessionPayment,
+} from "@/lib/payments";
 import type { OrderCheckoutPayload } from "@/lib/validators/order";
 
 function serializeOrder(order: {
@@ -711,6 +716,91 @@ export async function addOrderSupportNote(params: {
       role: note.author.role,
     },
   };
+}
+
+export async function refundOrder(params: {
+  orderId: string;
+  actorUserId: string;
+  reason: string;
+}) {
+  const order = await db.order.findUnique({
+    where: {
+      id: params.orderId,
+    },
+    include: {
+      items: {
+        select: {
+          productId: true,
+          quantity: true,
+        },
+      },
+    },
+  });
+
+  if (!order) {
+    throw new Error("Order not found.");
+  }
+
+  if (
+    !canRefundOrder({
+      status: order.status,
+      paymentStatus: order.paymentStatus,
+    })
+  ) {
+    throw new Error("Order is not refundable.");
+  }
+
+  const refund = await refundCheckoutSessionPayment({
+    orderId: order.id,
+    paymentProvider: order.paymentProvider,
+    paymentSessionId: order.paymentSessionId,
+    reason: params.reason,
+  });
+  const refundedAt = new Date();
+  const supportContent = `Reembolso registrado. Motivo: ${params.reason}`;
+
+  return db.$transaction(async (tx) => {
+    for (const item of order.items) {
+      await tx.product.update({
+        where: {
+          id: item.productId,
+        },
+        data: {
+          stock: {
+            increment: item.quantity,
+          },
+        },
+      });
+    }
+
+    const updatedOrder = await tx.order.update({
+      where: {
+        id: order.id,
+      },
+      data: {
+        status: "CANCELED",
+        paymentStatus: "REFUNDED",
+        canceledAt: order.canceledAt ?? refundedAt,
+        refundedAt,
+        paymentExpiresAt: null,
+      },
+    });
+
+    const note = await tx.orderNote.create({
+      data: {
+        orderId: order.id,
+        authorUserId: params.actorUserId,
+        content: supportContent,
+      },
+    });
+
+    return {
+      order: updatedOrder,
+      noteId: note.id,
+      refundMode: refund.mode,
+      refundReferenceId: refund.referenceId,
+    };
+  });
 }
 
 export async function getOrdersByUserId(userId: string) {

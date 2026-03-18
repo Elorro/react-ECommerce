@@ -52,3 +52,7 @@ export const bulkOrderStatusSchema = z.object({
 export const createOrderNoteSchema = z.object({
   content: sanitizedString(3, 1000),
 });
+
+export const refundOrderSchema = z.object({
+  reason: sanitizedString(5, 500),
+});

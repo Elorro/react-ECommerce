@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { OrderSupportPanel } from "@/components/admin/order-support-panel";
 import { auth } from "@/lib/auth";
+import { canRefundOrder } from "@/lib/order-status";
 import { hasPermission } from "@/lib/permissions";
 import { getOrderById, getOrderSupportNotes, getOrderTimeline } from "@/lib/orders";
 
@@ -17,6 +18,7 @@ export default async function OrderDetailPage({
   }
 
   const canViewSupportNotes = hasPermission(session.user.role, "orders.notes.manage");
+  const canRefund = hasPermission(session.user.role, "orders.refund");
   const [order, timeline, supportNotes] = await Promise.all([
     getOrderById(id, session.user.id, session.user.role),
     getOrderTimeline(id),
@@ -96,7 +98,19 @@ export default async function OrderDetailPage({
         </div>
       </div>
       {canViewSupportNotes ? (
-        <OrderSupportPanel orderId={order.id} initialNotes={supportNotes} />
+        <OrderSupportPanel
+          orderId={order.id}
+          initialNotes={supportNotes}
+          canRefund={
+            canRefund &&
+            canRefundOrder({
+              status: order.status,
+              paymentStatus: order.paymentStatus,
+            })
+          }
+          status={order.status}
+          paymentStatus={order.paymentStatus}
+        />
       ) : null}
     </section>
   );

@@ -15,7 +15,7 @@ export default async function HomePage() {
       <section className="grid gap-10 rounded-[2rem] border border-black/5 bg-white/80 p-8 shadow-card backdrop-blur md:grid-cols-[1.2fr_0.8fr] md:p-12">
         <div className="space-y-6">
           <span className="inline-flex rounded-full bg-brand/10 px-4 py-1 text-sm font-semibold text-brand">
-            Plataforma rescatada y reconstruida
+            Coleccion destacada
           </span>
           <div className="space-y-4">
             <h1 className="max-w-3xl font-display text-5xl leading-tight text-ink sm:text-6xl">

@@ -10,9 +10,11 @@ type AdminOrder = {
   id: string;
   customerName: string;
   customerEmail: string;
-  status: "PENDING" | "PAID" | "FULFILLED" | "CANCELED";
-  paymentStatus: "UNPAID" | "REQUIRES_ACTION" | "PAID" | "FAILED";
+  status: "PENDING" | "PAID" | "PROCESSING" | "FULFILLED" | "CANCELED";
+  paymentStatus: "UNPAID" | "REQUIRES_ACTION" | "PAID" | "FAILED" | "REFUNDED";
   paymentExpiresAt: string | null;
+  processingStartedAt: string | null;
+  refundedAt: string | null;
   totalAmount: number;
   itemCount: number;
   createdAt: string;
@@ -73,7 +75,7 @@ export function AdminOrdersTable({
     pushToast({ tone: "success", message: `Orden ${order.id} actualizada.` });
   };
 
-  const runBulkStatus = async (status: "PAID" | "FULFILLED" | "CANCELED") => {
+  const runBulkStatus = async (status: "PAID" | "PROCESSING" | "FULFILLED" | "CANCELED") => {
     if (!selectedIds.length) {
       pushToast({ tone: "error", message: "Selecciona al menos una orden." });
       return;
@@ -109,11 +111,27 @@ export function AdminOrdersTable({
               ...item,
               status,
               paymentStatus:
-                status === "PAID" || status === "FULFILLED"
+                status === "PAID" || status === "PROCESSING" || status === "FULFILLED"
                   ? "PAID"
-                  : item.paymentStatus !== "PAID"
-                    ? "FAILED"
-                    : item.paymentStatus,
+                  : status === "CANCELED" && item.paymentStatus === "PAID"
+                    ? "REFUNDED"
+                    : status === "CANCELED" && item.paymentStatus === "REFUNDED"
+                      ? "REFUNDED"
+                      : status === "CANCELED"
+                        ? "FAILED"
+                        : item.paymentStatus,
+              processingStartedAt:
+                status === "PROCESSING"
+                  ? new Date().toISOString()
+                  : status === "PAID"
+                    ? null
+                    : item.processingStartedAt,
+              refundedAt:
+                status === "CANCELED" && item.paymentStatus === "PAID"
+                  ? new Date().toISOString()
+                  : status !== "CANCELED"
+                    ? null
+                    : item.refundedAt,
             }
           : item,
       ),
@@ -146,6 +164,7 @@ export function AdminOrdersTable({
             <option value="">Todos los estados</option>
             <option value="PENDING">PENDING</option>
             <option value="PAID">PAID</option>
+            <option value="PROCESSING">PROCESSING</option>
             <option value="FULFILLED">FULFILLED</option>
             <option value="CANCELED">CANCELED</option>
           </select>
@@ -159,6 +178,7 @@ export function AdminOrdersTable({
             <option value="REQUIRES_ACTION">REQUIRES_ACTION</option>
             <option value="PAID">PAID</option>
             <option value="FAILED">FAILED</option>
+            <option value="REFUNDED">REFUNDED</option>
           </select>
           <button
             type="submit"
@@ -186,6 +206,14 @@ export function AdminOrdersTable({
             className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold"
           >
             Marcar fulfilled
+          </button>
+          <button
+            type="button"
+            onClick={() => runBulkStatus("PROCESSING")}
+            disabled={bulkSaving}
+            className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold"
+          >
+            Marcar processing
           </button>
           <button
             type="button"
@@ -271,6 +299,11 @@ function OrderRow({
             expira {new Date(order.paymentExpiresAt).toLocaleString("es-CO")}
           </p>
         ) : null}
+        {order.refundedAt ? (
+          <p className="text-xs text-black/45">
+            refund {new Date(order.refundedAt).toLocaleString("es-CO")}
+          </p>
+        ) : null}
       </div>
 
       <label className="text-sm font-medium">
@@ -290,6 +323,9 @@ function OrderRow({
           <option value="PAID" disabled={!allowedStatuses.includes("PAID")}>
             PAID
           </option>
+          <option value="PROCESSING" disabled={!allowedStatuses.includes("PROCESSING")}>
+            PROCESSING
+          </option>
           <option value="FULFILLED" disabled={!allowedStatuses.includes("FULFILLED")}>
             FULFILLED
           </option>
@@ -300,7 +336,13 @@ function OrderRow({
       </label>
 
       <div className="flex items-center text-sm font-semibold text-brand">
-        {order.status === "FULFILLED" ? "Listo" : "Pendiente"}
+        {order.status === "FULFILLED"
+          ? "Listo"
+          : order.status === "PROCESSING"
+            ? "En preparación"
+            : order.paymentStatus === "REFUNDED"
+              ? "Reembolsada"
+              : "Pendiente"}
       </div>
 
       <Link

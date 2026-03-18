@@ -1,5 +1,5 @@
-export type OrderStatusValue = "PENDING" | "PAID" | "FULFILLED" | "CANCELED";
-export type PaymentStatusValue = "UNPAID" | "REQUIRES_ACTION" | "PAID" | "FAILED";
+export type OrderStatusValue = "PENDING" | "PAID" | "PROCESSING" | "FULFILLED" | "CANCELED";
+export type PaymentStatusValue = "UNPAID" | "REQUIRES_ACTION" | "PAID" | "FAILED" | "REFUNDED";
 
 export function getAllowedOrderStatusTransitions(input: {
   status: OrderStatusValue;
@@ -9,12 +9,16 @@ export function getAllowedOrderStatusTransitions(input: {
     return [input.status];
   }
 
+  if (input.status === "PROCESSING") {
+    return ["PROCESSING", "FULFILLED", "CANCELED"];
+  }
+
   if (input.status === "PAID") {
-    return ["PAID", "FULFILLED", "CANCELED"];
+    return ["PAID", "PROCESSING", "FULFILLED", "CANCELED"];
   }
 
   if (input.paymentStatus === "PAID") {
-    return ["PENDING", "PAID", "CANCELED"];
+    return ["PENDING", "PAID", "PROCESSING", "CANCELED"];
   }
 
   return ["PENDING", "CANCELED"];

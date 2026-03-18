@@ -36,7 +36,7 @@ export const createCategorySchema = z.object({
 export const updateCategorySchema = createCategorySchema;
 
 export const updateOrderStatusSchema = z.object({
-  status: z.enum(["PENDING", "PAID", "FULFILLED", "CANCELED"]),
+  status: z.enum(["PENDING", "PAID", "PROCESSING", "FULFILLED", "CANCELED"]),
 });
 
 export const bulkProductActionSchema = z.object({
@@ -46,7 +46,7 @@ export const bulkProductActionSchema = z.object({
 
 export const bulkOrderStatusSchema = z.object({
   ids: z.array(z.string().min(1)).min(1).max(50),
-  status: z.enum(["PAID", "FULFILLED", "CANCELED"]),
+  status: z.enum(["PAID", "PROCESSING", "FULFILLED", "CANCELED"]),
 });
 
 export const createOrderNoteSchema = z.object({

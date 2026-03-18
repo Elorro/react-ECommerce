@@ -119,8 +119,10 @@ model Order {
   paymentProvider  String?
   paymentSessionId String?       @unique
   paymentExpiresAt DateTime?
+  processingStartedAt DateTime?
   fulfilledAt      DateTime?
   canceledAt       DateTime?
+  refundedAt       DateTime?
   currency         String        @default("USD")
   subtotalAmount   Decimal
   totalAmount      Decimal
@@ -198,6 +200,7 @@ enum ProductStatus {
 enum OrderStatus {
   PENDING
   PAID
+  PROCESSING
   FULFILLED
   CANCELED
 }
@@ -207,6 +210,7 @@ enum PaymentStatus {
   REQUIRES_ACTION
   PAID
   FAILED
+  REFUNDED
 }
 
 enum LogLevel {

@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { getRequestId, logEvent, withRequestIdHeaders } from "@/lib/logger";
 import { recordOperationalEvent } from "@/lib/observability";
-import { confirmStripeOrderPaymentBySessionId } from "@/lib/orders";
+import { confirmStripeOrderPaymentBySessionId, failStripeOrderPaymentBySessionId } from "@/lib/orders";
 import { getStripe, isStripeConfigured } from "@/lib/payments";
 
 export async function POST(request: Request) {
@@ -53,6 +53,14 @@ export async function POST(request: Request) {
 
       if (session.id) {
         await confirmStripeOrderPaymentBySessionId(session.id);
+      }
+    }
+
+    if (event.type === "checkout.session.expired" || event.type === "checkout.session.async_payment_failed") {
+      const session = event.data.object as Stripe.Checkout.Session;
+
+      if (session.id) {
+        await failStripeOrderPaymentBySessionId(session.id);
       }
     }
 

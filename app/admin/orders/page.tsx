@@ -26,6 +26,7 @@ export default async function AdminOrdersPage({
   const status =
     params.status === "PENDING" ||
     params.status === "PAID" ||
+    params.status === "PROCESSING" ||
     params.status === "FULFILLED" ||
     params.status === "CANCELED"
       ? params.status
@@ -34,6 +35,7 @@ export default async function AdminOrdersPage({
     params.paymentStatus === "UNPAID" ||
     params.paymentStatus === "REQUIRES_ACTION" ||
     params.paymentStatus === "PAID" ||
+    params.paymentStatus === "REFUNDED" ||
     params.paymentStatus === "FAILED"
       ? params.paymentStatus
       : undefined;

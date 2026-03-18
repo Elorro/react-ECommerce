@@ -15,6 +15,8 @@ function serializeOrder(order: {
   shippingAddress: string;
   subtotalAmount: Prisma.Decimal;
   totalAmount: Prisma.Decimal;
+  processingStartedAt?: Date | null;
+  refundedAt?: Date | null;
   items: Array<{
     id: string;
     quantity: number;
@@ -26,6 +28,8 @@ function serializeOrder(order: {
     ...order,
     subtotalAmount: Number(order.subtotalAmount),
     totalAmount: Number(order.totalAmount),
+    processingStartedAt: order.processingStartedAt?.toISOString() ?? null,
+    refundedAt: order.refundedAt?.toISOString() ?? null,
     items: order.items.map((item) => ({
       id: item.id,
       quantity: item.quantity,
@@ -77,6 +81,8 @@ async function finalizePaidOrder(order: {
         status: "PAID",
         paymentStatus: "PAID",
         paymentExpiresAt: null,
+        processingStartedAt: null,
+        refundedAt: null,
       },
       include: {
         items: {
@@ -174,6 +180,7 @@ export async function createOrder(
         userId: context.userId,
         status: "PAID",
         paymentStatus: "PAID",
+        refundedAt: null,
         customerName: payload.customerName,
         customerEmail: context.userEmail,
         shippingAddress: payload.shippingAddress,
@@ -228,6 +235,7 @@ export async function createPendingStripeOrder(
       paymentStatus: "REQUIRES_ACTION",
       paymentProvider: "stripe",
       paymentExpiresAt: getPendingPaymentExpiryDate(),
+      refundedAt: null,
       items: {
         create: normalizedItems.map((item) => ({
           productId: item.product.id,
@@ -322,6 +330,7 @@ export async function confirmStripeOrderPayment(params: {
         status: "CANCELED",
         paymentStatus: "FAILED",
         canceledAt: new Date(),
+        refundedAt: null,
       },
       include: {
         items: {
@@ -382,6 +391,7 @@ export async function confirmStripeOrderPaymentBySessionId(sessionId: string) {
         status: "CANCELED",
         paymentStatus: "FAILED",
         canceledAt: new Date(),
+        refundedAt: null,
       },
       include: {
         items: {
@@ -407,6 +417,49 @@ export async function confirmStripeOrderPaymentBySessionId(sessionId: string) {
   const finalized = await finalizePaidOrder(order);
 
   return serializeOrder(finalized);
+}
+
+export async function failStripeOrderPaymentBySessionId(sessionId: string) {
+  const order = await db.order.findFirst({
+    where: {
+      paymentSessionId: sessionId,
+    },
+    include: {
+      items: {
+        include: {
+          product: true,
+        },
+      },
+    },
+  });
+
+  if (!order) {
+    return null;
+  }
+
+  if (order.paymentStatus === "FAILED" || order.paymentStatus === "REFUNDED") {
+    return serializeOrder(order);
+  }
+
+  const failed = await db.order.update({
+    where: { id: order.id },
+    data: {
+      status: "CANCELED",
+      paymentStatus: "FAILED",
+      canceledAt: order.canceledAt ?? new Date(),
+      refundedAt: null,
+      paymentExpiresAt: null,
+    },
+    include: {
+      items: {
+        include: {
+          product: true,
+        },
+      },
+    },
+  });
+
+  return serializeOrder(failed);
 }
 
 export async function getOrderById(
@@ -455,8 +508,10 @@ export async function getOrderTimeline(orderId: string) {
         createdAt: true,
         paymentStatus: true,
         paymentExpiresAt: true,
+        processingStartedAt: true,
         fulfilledAt: true,
         canceledAt: true,
+        refundedAt: true,
       },
     }),
     db.operationalLog.findMany({
@@ -536,6 +591,17 @@ export async function getOrderTimeline(orderId: string) {
     });
   }
 
+  if (order.processingStartedAt) {
+    timeline.push({
+      id: `${order.id}:processing`,
+      tone: "info",
+      title: "Orden en preparación",
+      description: "El equipo operativo tomó la orden para fulfillment.",
+      createdAt: order.processingStartedAt.toISOString(),
+      metadata: null,
+    });
+  }
+
   if (order.canceledAt) {
     timeline.push({
       id: `${order.id}:canceled`,
@@ -543,6 +609,19 @@ export async function getOrderTimeline(orderId: string) {
       title: "Orden cancelada",
       description: "La orden fue cancelada o expirada.",
       createdAt: order.canceledAt.toISOString(),
+      metadata: {
+        paymentStatus: order.paymentStatus,
+      },
+    });
+  }
+
+  if (order.refundedAt) {
+    timeline.push({
+      id: `${order.id}:refunded`,
+      tone: "warn",
+      title: "Pago reembolsado",
+      description: "La orden fue cancelada después del cobro y quedó reembolsada.",
+      createdAt: order.refundedAt.toISOString(),
       metadata: {
         paymentStatus: order.paymentStatus,
       },
@@ -655,8 +734,8 @@ export async function getOrdersByUserId(userId: string) {
 export async function getAdminOrders(filters: {
   page: number;
   q?: string;
-  status?: "PENDING" | "PAID" | "FULFILLED" | "CANCELED";
-  paymentStatus?: "UNPAID" | "REQUIRES_ACTION" | "PAID" | "FAILED";
+  status?: "PENDING" | "PAID" | "PROCESSING" | "FULFILLED" | "CANCELED";
+  paymentStatus?: "UNPAID" | "REQUIRES_ACTION" | "PAID" | "FAILED" | "REFUNDED";
 }) {
   const query = filters.q?.trim();
   const where = {
@@ -702,6 +781,8 @@ export async function getAdminOrders(filters: {
       status: order.status,
       paymentStatus: order.paymentStatus,
       paymentExpiresAt: order.paymentExpiresAt?.toISOString() ?? null,
+      processingStartedAt: order.processingStartedAt?.toISOString() ?? null,
+      refundedAt: order.refundedAt?.toISOString() ?? null,
       totalAmount: Number(order.totalAmount),
       itemCount: order.items.reduce((sum, item) => sum + item.quantity, 0),
       createdAt: order.createdAt.toISOString(),
@@ -714,7 +795,7 @@ export async function getAdminOrders(filters: {
 
 export async function updateOrderStatus(
   orderId: string,
-  status: "PENDING" | "PAID" | "FULFILLED" | "CANCELED",
+  status: "PENDING" | "PAID" | "PROCESSING" | "FULFILLED" | "CANCELED",
 ) {
   const current = await db.order.findUnique({
     where: {
@@ -724,8 +805,10 @@ export async function updateOrderStatus(
       id: true,
       status: true,
       paymentStatus: true,
+      processingStartedAt: true,
       fulfilledAt: true,
       canceledAt: true,
+      refundedAt: true,
     },
   });
 
@@ -754,22 +837,43 @@ export async function updateOrderStatus(
     data: {
       status,
       paymentStatus:
-        status === "PAID" || status === "FULFILLED"
+        status === "PAID" || status === "PROCESSING" || status === "FULFILLED"
           ? "PAID"
-          : status === "CANCELED" && current.paymentStatus !== "PAID"
-            ? "FAILED"
+          : status === "CANCELED" && current.paymentStatus === "PAID"
+            ? "REFUNDED"
+            : status === "CANCELED" && current.paymentStatus === "REFUNDED"
+              ? "REFUNDED"
+              : status === "CANCELED"
+                ? "FAILED"
             : current.paymentStatus,
+      processingStartedAt:
+        status === "PROCESSING"
+          ? current.processingStartedAt ?? new Date()
+          : status === "PAID"
+            ? null
+            : current.processingStartedAt,
       fulfilledAt: status === "FULFILLED" ? new Date() : null,
       canceledAt: status === "CANCELED" ? new Date() : null,
+      refundedAt:
+        status === "CANCELED" && current.paymentStatus === "PAID"
+          ? new Date()
+          : status !== "CANCELED"
+            ? null
+            : current.refundedAt,
       paymentExpiresAt:
-        status === "CANCELED" || status === "PAID" || status === "FULFILLED" ? null : undefined,
+        status === "CANCELED" ||
+        status === "PAID" ||
+        status === "PROCESSING" ||
+        status === "FULFILLED"
+          ? null
+          : undefined,
     },
   });
 }
 
 export async function bulkUpdateOrderStatuses(
   orderIds: string[],
-  status: "PAID" | "FULFILLED" | "CANCELED",
+  status: "PAID" | "PROCESSING" | "FULFILLED" | "CANCELED",
 ) {
   const orders = await db.order.findMany({
     where: {
@@ -781,6 +885,8 @@ export async function bulkUpdateOrderStatuses(
       id: true,
       status: true,
       paymentStatus: true,
+      processingStartedAt: true,
+      refundedAt: true,
     },
   });
 
@@ -802,14 +908,36 @@ export async function bulkUpdateOrderStatuses(
         data: {
           status,
           paymentStatus:
-            status === "PAID" || status === "FULFILLED"
+            status === "PAID" || status === "PROCESSING" || status === "FULFILLED"
               ? "PAID"
-              : order.paymentStatus !== "PAID"
-                ? "FAILED"
-                : order.paymentStatus,
+              : status === "CANCELED" && order.paymentStatus === "PAID"
+                ? "REFUNDED"
+                : status === "CANCELED" && order.paymentStatus === "REFUNDED"
+                  ? "REFUNDED"
+                  : status === "CANCELED"
+                    ? "FAILED"
+                    : order.paymentStatus,
+          processingStartedAt:
+            status === "PROCESSING"
+              ? order.processingStartedAt ?? new Date()
+              : status === "PAID"
+                ? null
+                : order.processingStartedAt,
           fulfilledAt: status === "FULFILLED" ? new Date() : null,
           canceledAt: status === "CANCELED" ? new Date() : null,
-          paymentExpiresAt: status === "CANCELED" || status === "PAID" || status === "FULFILLED" ? null : undefined,
+          refundedAt:
+            status === "CANCELED" && order.paymentStatus === "PAID"
+              ? new Date()
+              : status !== "CANCELED"
+                ? null
+                : order.refundedAt,
+          paymentExpiresAt:
+            status === "CANCELED" ||
+            status === "PAID" ||
+            status === "PROCESSING" ||
+            status === "FULFILLED"
+              ? null
+              : undefined,
         },
       }),
     ),
@@ -848,6 +976,7 @@ export async function expireStalePendingOrders(now = new Date()) {
       status: "CANCELED",
       paymentStatus: "FAILED",
       canceledAt: now,
+      refundedAt: null,
     },
   });
 
@@ -859,8 +988,10 @@ export async function getAdminOrderMetrics() {
     totalOrders,
     pendingOrders,
     paidOrders,
+    processingOrders,
     fulfilledOrders,
     failedPayments,
+    refundedPayments,
     requiresActionOrders,
     canceledOrders,
     revenue,
@@ -878,12 +1009,22 @@ export async function getAdminOrderMetrics() {
     }),
     db.order.count({
       where: {
+        status: "PROCESSING",
+      },
+    }),
+    db.order.count({
+      where: {
         status: "FULFILLED",
       },
     }),
     db.order.count({
       where: {
         paymentStatus: "FAILED",
+      },
+    }),
+    db.order.count({
+      where: {
+        paymentStatus: "REFUNDED",
       },
     }),
     db.order.count({
@@ -910,8 +1051,10 @@ export async function getAdminOrderMetrics() {
     totalOrders,
     pendingOrders,
     paidOrders,
+    processingOrders,
     fulfilledOrders,
     failedPayments,
+    refundedPayments,
     requiresActionOrders,
     canceledOrders,
     paidRevenue: Number(revenue._sum.totalAmount ?? 0),

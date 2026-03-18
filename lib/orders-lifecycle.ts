@@ -5,7 +5,7 @@ export function getPendingPaymentExpiryDate(from = new Date()) {
 }
 
 export function shouldExpirePendingOrder(params: {
-  paymentStatus: "UNPAID" | "REQUIRES_ACTION" | "PAID" | "FAILED";
+  paymentStatus: "UNPAID" | "REQUIRES_ACTION" | "PAID" | "FAILED" | "REFUNDED";
   paymentExpiresAt: Date | null;
   now?: Date;
 }) {

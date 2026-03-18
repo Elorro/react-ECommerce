@@ -74,8 +74,10 @@ export async function PATCH(
         after: {
           status: order.status,
           paymentStatus: order.paymentStatus,
+          processingStartedAt: order.processingStartedAt?.toISOString() ?? null,
           fulfilledAt: order.fulfilledAt?.toISOString() ?? null,
           canceledAt: order.canceledAt?.toISOString() ?? null,
+          refundedAt: order.refundedAt?.toISOString() ?? null,
         },
       },
     });

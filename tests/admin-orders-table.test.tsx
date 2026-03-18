@@ -28,6 +28,8 @@ describe("AdminOrdersTable", () => {
               status: "PENDING",
               paymentStatus: "UNPAID",
               paymentExpiresAt: null,
+              processingStartedAt: null,
+              refundedAt: null,
               totalAmount: 50,
               itemCount: 1,
               createdAt: new Date("2026-01-01T00:00:00.000Z").toISOString(),

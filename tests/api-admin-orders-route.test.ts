@@ -30,8 +30,10 @@ describe("api/admin/orders/[id] PATCH", () => {
       id: "ord_1",
       status: "PAID",
       paymentStatus: "PAID",
+      processingStartedAt: null,
       fulfilledAt: null,
       canceledAt: null,
+      refundedAt: null,
     });
   });
 
@@ -70,6 +72,11 @@ describe("api/admin/orders/[id] PATCH", () => {
     updateOrderStatusMock.mockResolvedValue({
       id: "ord_1",
       status: "FULFILLED",
+      paymentStatus: "PAID",
+      processingStartedAt: null,
+      fulfilledAt: new Date("2026-03-18T02:00:00.000Z"),
+      canceledAt: null,
+      refundedAt: null,
     });
 
     const { PATCH } = await import("@/app/api/admin/orders/[id]/route");

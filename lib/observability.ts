@@ -14,6 +14,10 @@ type OperationalEventInput = {
   metadata?: Record<string, unknown>;
 };
 
+function isTestRuntime() {
+  return process.env.NODE_ENV === "test" || process.env.VITEST === "true";
+}
+
 export async function recordOperationalEvent(input: OperationalEventInput) {
   try {
     await db.operationalLog.create({
@@ -31,6 +35,10 @@ export async function recordOperationalEvent(input: OperationalEventInput) {
       },
     });
   } catch (error) {
+    if (isTestRuntime()) {
+      return;
+    }
+
     logEvent("ERROR", "observability.persist.failed", {
       scope: input.scope,
       error: error instanceof Error ? error.message : "unknown",

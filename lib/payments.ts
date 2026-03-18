@@ -1,4 +1,5 @@
 import Stripe from "stripe";
+import { isLocalAppUrl } from "@/lib/runtime-config";
 
 let stripeClient: Stripe | null = null;
 
@@ -7,7 +8,7 @@ export function isStripeConfigured() {
 }
 
 export function isStripeMockEnabled() {
-  return process.env.E2E_STRIPE_MODE === "mock";
+  return process.env.E2E_STRIPE_MODE === "mock" && isLocalAppUrl();
 }
 
 export function isStripeCheckoutEnabled() {

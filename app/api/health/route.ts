@@ -3,6 +3,7 @@ import { getAvailableAuthProviders } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getObservabilityMetrics } from "@/lib/observability";
 import { isStripeCheckoutEnabled, isStripeConfigured, isStripeMockEnabled } from "@/lib/payments";
+import { getRuntimeReadiness } from "@/lib/runtime-config";
 
 export async function GET() {
   let databaseOk = true;
@@ -14,30 +15,11 @@ export async function GET() {
   }
 
   const metrics = await getObservabilityMetrics();
-  const missingReadiness: string[] = [];
-
-  if (!process.env.NEXTAUTH_SECRET) {
-    missingReadiness.push("NEXTAUTH_SECRET");
-  }
-
-  if (!process.env.NEXTAUTH_URL) {
-    missingReadiness.push("NEXTAUTH_URL");
-  }
-
-  if (!process.env.NEXT_PUBLIC_APP_URL) {
-    missingReadiness.push("NEXT_PUBLIC_APP_URL");
-  }
-
-  if (!process.env.INTERNAL_JOB_SECRET) {
-    missingReadiness.push("INTERNAL_JOB_SECRET");
-  }
-
-  if (!process.env.DATABASE_URL_POSTGRES) {
-    missingReadiness.push("DATABASE_URL_POSTGRES");
-  }
+  const readiness = getRuntimeReadiness();
+  const ok = databaseOk && (process.env.NODE_ENV !== "production" || readiness.productionReady);
 
   return NextResponse.json({
-    ok: databaseOk,
+    ok,
     service: "atelier-commerce",
     environment: process.env.NODE_ENV,
     database: {
@@ -51,8 +33,9 @@ export async function GET() {
     stripeMockEnabled: isStripeMockEnabled(),
     jobsConfigured: Boolean(process.env.INTERNAL_JOB_SECRET),
     readiness: {
-      productionReady: databaseOk && missingReadiness.length === 0,
-      missing: missingReadiness,
+      productionReady: readiness.productionReady,
+      issues: readiness.issues,
+      warnings: readiness.warnings,
       cronReconcileUrl: `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/internal/orders/reconcile`,
     },
     observability: {
@@ -61,5 +44,5 @@ export async function GET() {
       stalePendingPayments: metrics.stalePendingPayments,
     },
     timestamp: new Date().toISOString(),
-  });
+  }, { status: ok ? 200 : 503 });
 }

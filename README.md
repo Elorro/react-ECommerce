@@ -28,12 +28,14 @@ Base full-stack para un e-commerce moderno con `Next.js`, `TypeScript`, `Tailwin
 - `npm run db:push:pg`: sincronizar esquema PostgreSQL
 - `npm run db:migrate:pg`: migraciones dev sobre PostgreSQL
 - `npm run db:seed:pg`: poblar PostgreSQL
+- `GET /api/readiness`: readiness estricto para despliegue y probes
 
 ## Variables de entorno
 
 Copia `.env.example` a `.env` y completa:
 
 - `DATABASE_URL`: SQLite local por defecto
+- `.env.production.example`: base recomendada para producción real
 - `NEXTAUTH_SECRET`: secreto real
 - `NEXTAUTH_URL`: URL base de la app
 - `AUTH_GOOGLE_ID` y `AUTH_GOOGLE_SECRET`: OAuth Google
@@ -110,7 +112,7 @@ Runbook mínimo de despliegue:
 3. aplica `npm run db:generate:pg`
 4. aplica `npm run db:migrate:pg`
 5. construye con `npm run build`
-6. verifica `GET /api/health`
+6. verifica `GET /api/health` y `GET /api/readiness`
 7. si algo falla, restaura con `npm run ops:pg:restore -- .backups/<archivo>.dump`
 
 Cron mínimo recomendado:
@@ -120,5 +122,14 @@ Cron mínimo recomendado:
 - necesita `INTERNAL_JOB_SECRET` y `NEXT_PUBLIC_APP_URL` o `NEXTAUTH_URL`
 
 La respuesta de `GET /api/health` también expone un bloque `readiness` con variables faltantes y la URL esperada del job interno.
+
+`GET /api/readiness` devuelve `503` cuando la app no está lista para producción. En particular falla si:
+
+- falta un secreto o URL crítica
+- no hay ningún proveedor OAuth configurado
+- `DATABASE_URL` sigue apuntando a SQLite
+- Stripe está incompleto
+- `NEXTAUTH_URL` y `NEXT_PUBLIC_APP_URL` no coinciden
+- `E2E_STRIPE_MODE=mock` sigue activo fuera de entorno local
 
 El proyecto sigue usando SQLite por defecto para no romper el setup local actual.

@@ -1,12 +1,18 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { useCart } from "@/components/store/cart-provider";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { InlineNotice } from "@/components/ui/inline-notice";
 import { Skeleton } from "@/components/ui/skeleton";
 
 export function CartView() {
   const router = useRouter();
+  const [itemPendingRemoval, setItemPendingRemoval] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
   const {
     items,
     totalAmount,
@@ -17,7 +23,6 @@ export function CartView() {
     errorMessage,
     pendingAction,
     pendingItemId,
-    source,
   } = useCart();
 
   if (!isReady) {
@@ -76,6 +81,32 @@ export function CartView() {
 
   return (
     <section className="space-y-8">
+      <ConfirmDialog
+        open={itemPendingRemoval !== null}
+        title="¿Eliminar producto del carrito?"
+        description={
+          itemPendingRemoval
+            ? `${itemPendingRemoval.name} se quitará de tu carrito. Puedes volver a agregarlo después si cambias de idea.`
+            : ""
+        }
+        confirmLabel="Eliminar producto"
+        tone="danger"
+        busy={Boolean(
+          itemPendingRemoval &&
+            pendingItemId === itemPendingRemoval.id &&
+            pendingAction === "remove" &&
+            isSyncing,
+        )}
+        onCancel={() => setItemPendingRemoval(null)}
+        onConfirm={() => {
+          if (!itemPendingRemoval) {
+            return;
+          }
+
+          removeItem(itemPendingRemoval.id);
+          setItemPendingRemoval(null);
+        }}
+      />
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <span className="text-sm font-semibold uppercase tracking-[0.2em] text-brand">
@@ -133,7 +164,7 @@ export function CartView() {
               <button
                 type="button"
                 disabled={isSyncing}
-                onClick={() => removeItem(item.id)}
+                onClick={() => setItemPendingRemoval({ id: item.id, name: item.name })}
                 className="rounded-full border border-transparent px-3 py-2 text-sm font-semibold text-brand transition hover:bg-brand/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
               >
                 {pendingItemId === item.id && pendingAction === "remove" ? "Eliminando..." : "Eliminar"}

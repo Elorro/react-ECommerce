@@ -2,6 +2,12 @@ import { notFound } from "next/navigation";
 import { OrderSupportPanel } from "@/components/admin/order-support-panel";
 import { auth } from "@/lib/auth";
 import { canRefundOrder } from "@/lib/order-status";
+import {
+  formatOrderReference,
+  humanizeOrderStatus,
+  humanizePaymentStatus,
+  humanizeReturnStatus,
+} from "@/lib/order-presentation";
 import { hasPermission } from "@/lib/permissions";
 import { getOrderById, getOrderSupportNotes, getOrderTimeline } from "@/lib/orders";
 
@@ -38,7 +44,7 @@ export default async function OrderDetailPage({
         <span className="text-sm font-semibold uppercase tracking-[0.2em] text-brand">
           Pedido confirmado
         </span>
-        <h1 className="font-display text-4xl">Pedido {order.id}</h1>
+        <h1 className="font-display text-4xl">Pedido {formatOrderReference(order.id)}</h1>
         <p className="text-black/70">
           Aquí puedes revisar el estado de tu compra, los productos incluidos y cualquier actualización importante del pedido.
         </p>
@@ -47,6 +53,7 @@ export default async function OrderDetailPage({
         <InfoCard label="Cliente" value={`${order.customerName} · ${order.customerEmail}`} />
         <InfoCard label="Estado" value={humanizeOrderStatus(order.status)} />
         <InfoCard label="Pago" value={humanizePaymentStatus(order.paymentStatus)} />
+        <InfoCard label="Devolución" value={humanizeReturnStatus(order.returnStatus)} />
         <InfoCard label="Subtotal" value={`$${order.subtotalAmount.toFixed(2)}`} />
         <InfoCard label="Total" value={`$${order.totalAmount.toFixed(2)}`} />
       </div>
@@ -122,40 +129,6 @@ function InfoCard({ label, value }: { label: string; value: string }) {
       <p className="mt-2 text-lg font-medium">{value}</p>
     </div>
   );
-}
-
-function humanizeOrderStatus(status: string) {
-  switch (status) {
-    case "PENDING":
-      return "Pendiente";
-    case "PAID":
-      return "Confirmado";
-    case "PROCESSING":
-      return "En preparación";
-    case "FULFILLED":
-      return "Entregado";
-    case "CANCELED":
-      return "Cancelado";
-    default:
-      return status;
-  }
-}
-
-function humanizePaymentStatus(status: string) {
-  switch (status) {
-    case "UNPAID":
-      return "Sin pago";
-    case "REQUIRES_ACTION":
-      return "Pendiente";
-    case "PAID":
-      return "Pago recibido";
-    case "FAILED":
-      return "Pago no completado";
-    case "REFUNDED":
-      return "Reembolsado";
-    default:
-      return status;
-  }
 }
 
 function formatOrderEvent(event: {
@@ -248,8 +221,8 @@ function formatOrderEvent(event: {
   }
 
   return {
-    title: event.title,
-    description: event.description,
+    title: "Actualización del pedido",
+    description: "Tu pedido recibió una actualización reciente.",
     tone: event.tone,
     createdAt: event.createdAt,
   };

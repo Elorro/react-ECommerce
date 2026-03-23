@@ -52,6 +52,10 @@ export function CheckoutForm({
       return "Tu sesión expiró. Inicia sesión nuevamente para continuar.";
     }
 
+    if (normalized.includes("rate limit") || normalized.includes("too many")) {
+      return "Has realizado demasiados intentos seguidos. Espera unos segundos y vuelve a intentarlo.";
+    }
+
     return "No pudimos procesar tu solicitud. Revisa tus datos e inténtalo nuevamente.";
   };
 
@@ -82,6 +86,11 @@ export function CheckoutForm({
 
       if (response.status === 401) {
         redirectToSignIn();
+        return;
+      }
+
+      if (response.status === 429) {
+        setServerError("Has realizado demasiados intentos seguidos. Espera unos segundos y vuelve a intentarlo.");
         return;
       }
 
@@ -124,6 +133,12 @@ export function CheckoutForm({
       if (response.status === 401) {
         setIsRedirectingToPayment(false);
         redirectToSignIn();
+        return;
+      }
+
+      if (response.status === 429) {
+        setIsRedirectingToPayment(false);
+        setServerError("Has realizado demasiados intentos seguidos. Espera unos segundos y vuelve a intentarlo.");
         return;
       }
 
@@ -206,10 +221,12 @@ export function CheckoutForm({
 
         <Field
           label="Nombre completo"
+          required
           error={form.formState.errors.customerName?.message}
           input={
             <input
               {...form.register("customerName")}
+              aria-invalid={Boolean(form.formState.errors.customerName)}
               className="mt-2 w-full rounded-2xl border border-black/10 bg-canvas px-4 py-3 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
             />
           }
@@ -223,11 +240,13 @@ export function CheckoutForm({
 
         <Field
           label="Direccion de envio"
+          required
           error={form.formState.errors.shippingAddress?.message}
           input={
             <textarea
               rows={4}
               {...form.register("shippingAddress")}
+              aria-invalid={Boolean(form.formState.errors.shippingAddress)}
               className="mt-2 w-full rounded-2xl border border-black/10 bg-canvas px-4 py-3 transition focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
             />
           }
@@ -302,14 +321,16 @@ function Field({
   label,
   input,
   error,
+  required,
 }: {
   label: string;
   input: React.ReactNode;
   error?: string;
+  required?: boolean;
 }) {
   return (
     <label className="block text-sm font-medium">
-      {label}
+      {label} {required ? <span className="text-brand">*</span> : null}
       {input}
       {error ? <span className="mt-2 block text-sm text-brand">{error}</span> : null}
     </label>

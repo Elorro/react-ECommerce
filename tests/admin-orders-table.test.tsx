@@ -40,7 +40,8 @@ describe("AdminOrdersTable", () => {
       </ToastProvider>
     );
 
-    fireEvent.click(screen.getByText("Marcar pagadas"));
+    fireEvent.click(screen.getByText("Marcar como confirmadas"));
+    fireEvent.click(screen.getByText("Confirmar cambio"));
 
     await waitFor(() => {
       expect(screen.getByRole("status")).toHaveTextContent(

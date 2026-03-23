@@ -81,6 +81,10 @@ function toCartPayload(items: CartItem[]) {
   };
 }
 
+function isRateLimited(response: Response) {
+  return response.status === 429;
+}
+
 export function CartProvider({ children }: { children: ReactNode }) {
   const { data: session, status } = useSession();
   const { pushToast } = useToast();
@@ -158,6 +162,15 @@ export function CartProvider({ children }: { children: ReactNode }) {
         if (!response.ok) {
           if (response.status === 401) {
             redirectToSignIn();
+            return;
+          }
+
+          if (isRateLimited(response)) {
+            isHydratingUserCartRef.current = false;
+            setErrorMessage("Has realizado demasiadas solicitudes. Intenta de nuevo en unos segundos.");
+            setSource("anonymous");
+            setItems(readAnonymousCart());
+            setIsReady(true);
             return;
           }
 
@@ -278,6 +291,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
           return;
         }
 
+        if (isRateLimited(response)) {
+          setErrorMessage("Has realizado demasiadas solicitudes. Intenta de nuevo en unos segundos.");
+          return;
+        }
+
         setErrorMessage("No pudimos actualizar tu carrito. Intenta nuevamente.");
       }).catch((error) => {
         if (error instanceof DOMException && error.name === "AbortError") {
@@ -388,6 +406,11 @@ export function CartProvider({ children }: { children: ReactNode }) {
 
         if (response.status === 401) {
           redirectToSignIn();
+          return;
+        }
+
+        if (isRateLimited(response)) {
+          setErrorMessage("Has realizado demasiadas solicitudes. Intenta de nuevo en unos segundos.");
           return;
         }
 

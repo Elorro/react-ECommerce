@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { formatOrderReference, humanizeOrderStatus, humanizePaymentStatus } from "@/lib/order-presentation";
 import { confirmStripeOrderPayment } from "@/lib/orders";
 import { isStripeCheckoutEnabled } from "@/lib/payments";
 
@@ -45,7 +46,7 @@ export default async function CheckoutSuccessPage({
         Recibimos tu pago y tu pedido ya está registrado. Puedes revisar el detalle y seguir su estado cuando quieras.
       </p>
       <div className="rounded-3xl border border-black/5 bg-canvas px-5 py-4">
-        <p className="font-semibold">{order.id}</p>
+        <p className="font-semibold">{formatOrderReference(order.id)}</p>
         <p className="text-sm text-black/55">
           Estado: {humanizeOrderStatus(order.status)} · Pago: {humanizePaymentStatus(order.paymentStatus)}
         </p>
@@ -58,38 +59,4 @@ export default async function CheckoutSuccessPage({
       </Link>
     </section>
   );
-}
-
-function humanizeOrderStatus(status: string) {
-  switch (status) {
-    case "PENDING":
-      return "Pendiente";
-    case "PAID":
-      return "Confirmado";
-    case "PROCESSING":
-      return "En preparación";
-    case "FULFILLED":
-      return "Entregado";
-    case "CANCELED":
-      return "Cancelado";
-    default:
-      return status;
-  }
-}
-
-function humanizePaymentStatus(status: string) {
-  switch (status) {
-    case "UNPAID":
-      return "Sin pago";
-    case "REQUIRES_ACTION":
-      return "Pendiente";
-    case "PAID":
-      return "Pago recibido";
-    case "FAILED":
-      return "Pago no completado";
-    case "REFUNDED":
-      return "Reembolsado";
-    default:
-      return status;
-  }
 }

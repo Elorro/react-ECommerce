@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { formatOrderReference, humanizeOrderStatus, humanizePaymentStatus } from "@/lib/order-presentation";
 import { getOrdersByUserId } from "@/lib/orders";
 
 export const metadata = {
@@ -42,7 +43,7 @@ export default async function AccountPage() {
               >
                 <div className="flex items-center justify-between gap-4">
                   <div>
-                    <p className="font-semibold">{order.id}</p>
+                    <p className="font-semibold">{formatOrderReference(order.id)}</p>
                     <p className="text-sm text-black/55">
                       {humanizeOrderStatus(order.status)} · {humanizePaymentStatus(order.paymentStatus)}
                     </p>
@@ -66,38 +67,4 @@ export default async function AccountPage() {
       </div>
     </section>
   );
-}
-
-function humanizeOrderStatus(status: string) {
-  switch (status) {
-    case "PENDING":
-      return "Pendiente";
-    case "PAID":
-      return "Confirmado";
-    case "PROCESSING":
-      return "En preparación";
-    case "FULFILLED":
-      return "Entregado";
-    case "CANCELED":
-      return "Cancelado";
-    default:
-      return status;
-  }
-}
-
-function humanizePaymentStatus(status: string) {
-  switch (status) {
-    case "UNPAID":
-      return "Sin pago";
-    case "REQUIRES_ACTION":
-      return "Pago pendiente";
-    case "PAID":
-      return "Pago recibido";
-    case "FAILED":
-      return "Pago no completado";
-    case "REFUNDED":
-      return "Reembolsado";
-    default:
-      return status;
-  }
 }

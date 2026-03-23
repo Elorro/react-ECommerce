@@ -1,10 +1,11 @@
 "use client";
 
-import React from "react";
 import Link from "next/link";
 import { useState } from "react";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { useToast } from "@/components/ui/toast-provider";
 import { getAllowedOrderStatusTransitions } from "@/lib/order-status";
+import { formatOrderReference, humanizeOrderStatus, humanizePaymentStatus } from "@/lib/order-presentation";
 
 type AdminOrder = {
   id: string;
@@ -19,6 +20,28 @@ type AdminOrder = {
   itemCount: number;
   createdAt: string;
 };
+
+type ConfirmState =
+  | null
+  | {
+      title: string;
+      description: string;
+      confirmLabel: string;
+      tone: "default" | "danger";
+      run: () => Promise<void>;
+    };
+
+function humanizeAdminError(response: Response) {
+  if (response.status === 401 || response.status === 403) {
+    return "Tu sesión ya no tiene permisos para completar esta acción. Recarga la página e intenta de nuevo.";
+  }
+
+  if (response.status === 429) {
+    return "Has realizado demasiadas acciones seguidas. Espera unos segundos e inténtalo nuevamente.";
+  }
+
+  return "No pudimos completar esta acción. Vuelve a intentarlo.";
+}
 
 export function AdminOrdersTable({
   orders,
@@ -36,6 +59,7 @@ export function AdminOrdersTable({
   const [savingId, setSavingId] = useState<string | null>(null);
   const [selectedIds, setSelectedIds] = useState<string[]>([]);
   const [bulkSaving, setBulkSaving] = useState(false);
+  const [confirmState, setConfirmState] = useState<ConfirmState>(null);
   const { pushToast } = useToast();
 
   const updateRow = (id: string, patch: Partial<AdminOrder>) => {
@@ -56,23 +80,29 @@ export function AdminOrdersTable({
 
   const save = async (order: AdminOrder) => {
     setSavingId(order.id);
-    const response = await fetch(`/api/admin/orders/${order.id}`, {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        status: order.status,
-      }),
-    });
-    setSavingId(null);
+    try {
+      const response = await fetch(`/api/admin/orders/${order.id}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          status: order.status,
+        }),
+      });
 
-    if (!response.ok) {
-      pushToast({ tone: "error", message: "No se pudo actualizar la orden." });
-      return;
+      if (!response.ok) {
+        pushToast({ tone: "error", message: humanizeAdminError(response) });
+        return;
+      }
+
+      pushToast({ tone: "success", message: `Pedido ${formatOrderReference(order.id)} actualizado.` });
+    } catch {
+      pushToast({ tone: "error", message: "No pudimos actualizar el pedido por un problema de conexión." });
+    } finally {
+      setSavingId(null);
+      setConfirmState(null);
     }
-
-    pushToast({ tone: "success", message: `Orden ${order.id} actualizada.` });
   };
 
   const runBulkStatus = async (status: "PAID" | "PROCESSING" | "FULFILLED" | "CANCELED") => {
@@ -82,71 +112,93 @@ export function AdminOrdersTable({
     }
 
     setBulkSaving(true);
-    const response = await fetch("/api/admin/orders/bulk", {
-      method: "PATCH",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        ids: selectedIds,
-        status,
-      }),
-    });
-    setBulkSaving(false);
+    try {
+      const response = await fetch("/api/admin/orders/bulk", {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ids: selectedIds,
+          status,
+        }),
+      });
 
-    if (!response.ok) {
-      pushToast({ tone: "error", message: "No se pudo ejecutar la acción masiva." });
-      return;
-    }
+      if (!response.ok) {
+        pushToast({ tone: "error", message: humanizeAdminError(response) });
+        return;
+      }
 
-    const data = (await response.json()) as {
-      updatedCount: number;
-      updatedIds: string[];
-      skippedIds: string[];
-    };
-    setState((current) =>
-      current.map((item) =>
-        data.updatedIds.includes(item.id)
-          ? {
-              ...item,
-              status,
-              paymentStatus:
-                status === "PAID" || status === "PROCESSING" || status === "FULFILLED"
-                  ? "PAID"
-                  : status === "CANCELED" && item.paymentStatus === "PAID"
-                    ? "REFUNDED"
-                    : status === "CANCELED" && item.paymentStatus === "REFUNDED"
+      const data = (await response.json()) as {
+        updatedCount: number;
+        updatedIds: string[];
+        skippedIds: string[];
+      };
+      setState((current) =>
+        current.map((item) =>
+          data.updatedIds.includes(item.id)
+            ? {
+                ...item,
+                status,
+                paymentStatus:
+                  status === "PAID" || status === "PROCESSING" || status === "FULFILLED"
+                    ? "PAID"
+                    : status === "CANCELED" && item.paymentStatus === "PAID"
                       ? "REFUNDED"
-                      : status === "CANCELED"
-                        ? "FAILED"
-                        : item.paymentStatus,
-              processingStartedAt:
-                status === "PROCESSING"
-                  ? new Date().toISOString()
-                  : status === "PAID"
-                    ? null
-                    : item.processingStartedAt,
-              refundedAt:
-                status === "CANCELED" && item.paymentStatus === "PAID"
-                  ? new Date().toISOString()
-                  : status !== "CANCELED"
-                    ? null
-                    : item.refundedAt,
-            }
-          : item,
-      ),
-    );
-    setSelectedIds([]);
-    pushToast({
-      tone: data.skippedIds.length ? "error" : "success",
-      message: data.skippedIds.length
-        ? `Se actualizaron ${data.updatedCount} órdenes y ${data.skippedIds.length} se omitieron por transición inválida.`
-        : `Se actualizaron ${data.updatedCount} órdenes.`,
-    });
+                      : status === "CANCELED" && item.paymentStatus === "REFUNDED"
+                        ? "REFUNDED"
+                        : status === "CANCELED"
+                          ? "FAILED"
+                          : item.paymentStatus,
+                processingStartedAt:
+                  status === "PROCESSING"
+                    ? new Date().toISOString()
+                    : status === "PAID"
+                      ? null
+                      : item.processingStartedAt,
+                refundedAt:
+                  status === "CANCELED" && item.paymentStatus === "PAID"
+                    ? new Date().toISOString()
+                    : status !== "CANCELED"
+                      ? null
+                      : item.refundedAt,
+              }
+            : item,
+        ),
+      );
+      setSelectedIds([]);
+      pushToast({
+        tone: data.skippedIds.length ? "warn" : "success",
+        message: data.skippedIds.length
+          ? `Se actualizaron ${data.updatedCount} pedidos y ${data.skippedIds.length} quedaron sin cambios por una transición no válida.`
+          : `Se actualizaron ${data.updatedCount} pedidos.`,
+      });
+    } catch {
+      pushToast({ tone: "error", message: "No pudimos ejecutar la acción masiva por un problema de conexión." });
+    } finally {
+      setBulkSaving(false);
+      setConfirmState(null);
+    }
   };
 
   return (
     <div className="grid gap-4">
+      <ConfirmDialog
+        open={confirmState !== null}
+        title={confirmState?.title ?? ""}
+        description={confirmState?.description ?? ""}
+        confirmLabel={confirmState?.confirmLabel ?? "Confirmar"}
+        tone={confirmState?.tone ?? "default"}
+        busy={Boolean(savingId || bulkSaving)}
+        onCancel={() => setConfirmState(null)}
+        onConfirm={() => {
+          if (!confirmState) {
+            return;
+          }
+
+          void confirmState.run();
+        }}
+      />
       <section className="grid gap-4 rounded-3xl border border-black/5 bg-white p-5 shadow-card">
         <form action="/admin/orders" className="grid gap-4 md:grid-cols-[1.4fr_1fr_1fr_auto]">
           <input
@@ -162,11 +214,11 @@ export function AdminOrdersTable({
             className="rounded-2xl border border-black/10 bg-canvas px-4 py-3"
           >
             <option value="">Todos los estados</option>
-            <option value="PENDING">PENDING</option>
-            <option value="PAID">PAID</option>
-            <option value="PROCESSING">PROCESSING</option>
-            <option value="FULFILLED">FULFILLED</option>
-            <option value="CANCELED">CANCELED</option>
+            <option value="PENDING">Pendiente</option>
+            <option value="PAID">Confirmado</option>
+            <option value="PROCESSING">En preparación</option>
+            <option value="FULFILLED">Entregado</option>
+            <option value="CANCELED">Cancelado</option>
           </select>
           <select
             name="paymentStatus"
@@ -174,11 +226,11 @@ export function AdminOrdersTable({
             className="rounded-2xl border border-black/10 bg-canvas px-4 py-3"
           >
             <option value="">Todos los pagos</option>
-            <option value="UNPAID">UNPAID</option>
-            <option value="REQUIRES_ACTION">REQUIRES_ACTION</option>
-            <option value="PAID">PAID</option>
-            <option value="FAILED">FAILED</option>
-            <option value="REFUNDED">REFUNDED</option>
+            <option value="UNPAID">Sin pago</option>
+            <option value="REQUIRES_ACTION">Pendiente</option>
+            <option value="PAID">Pago recibido</option>
+            <option value="FAILED">Pago no completado</option>
+            <option value="REFUNDED">Reembolsado</option>
           </select>
           <button
             type="submit"
@@ -193,31 +245,63 @@ export function AdminOrdersTable({
           </span>
           <button
             type="button"
-            onClick={() => runBulkStatus("PAID")}
+            onClick={() =>
+              setConfirmState({
+                title: "¿Marcar pedidos como confirmados?",
+                description: "Usa esta acción solo si ya confirmaste el cobro correspondiente.",
+                confirmLabel: "Confirmar cambio",
+                tone: "default",
+                run: async () => runBulkStatus("PAID"),
+              })
+            }
             disabled={bulkSaving}
             className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold"
           >
-            Marcar pagadas
+            Marcar como confirmadas
           </button>
           <button
             type="button"
-            onClick={() => runBulkStatus("FULFILLED")}
+            onClick={() =>
+              setConfirmState({
+                title: "¿Marcar pedidos como entregados?",
+                description: "Esta actualización indica que la entrega ya fue completada.",
+                confirmLabel: "Marcar entregados",
+                tone: "default",
+                run: async () => runBulkStatus("FULFILLED"),
+              })
+            }
             disabled={bulkSaving}
             className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold"
           >
-            Marcar fulfilled
+            Marcar como entregadas
           </button>
           <button
             type="button"
-            onClick={() => runBulkStatus("PROCESSING")}
+            onClick={() =>
+              setConfirmState({
+                title: "¿Pasar pedidos a preparación?",
+                description: "Esto indicará al equipo que los pedidos ya están en alistamiento.",
+                confirmLabel: "Actualizar pedidos",
+                tone: "default",
+                run: async () => runBulkStatus("PROCESSING"),
+              })
+            }
             disabled={bulkSaving}
             className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold"
           >
-            Marcar processing
+            Pasar a preparación
           </button>
           <button
             type="button"
-            onClick={() => runBulkStatus("CANCELED")}
+            onClick={() =>
+              setConfirmState({
+                title: "¿Cancelar pedidos seleccionados?",
+                description: "Si alguno ya estaba cobrado, el panel aplicará el estado correspondiente. Revisa bien esta acción antes de continuar.",
+                confirmLabel: "Cancelar pedidos",
+                tone: "danger",
+                run: async () => runBulkStatus("CANCELED"),
+              })
+            }
             disabled={bulkSaving}
             className="rounded-full border border-black/10 px-4 py-2 text-sm font-semibold"
           >
@@ -241,9 +325,11 @@ export function AdminOrdersTable({
           order={order}
           isSelected={selectedIds.includes(order.id)}
           isSaving={savingId === order.id}
+          isBulkSaving={bulkSaving}
           onToggleSelection={toggleSelection}
           onUpdateRow={updateRow}
           onSave={save}
+          onConfirm={setConfirmState}
         />
       ))}
     </div>
@@ -254,16 +340,20 @@ function OrderRow({
   order,
   isSelected,
   isSaving,
+  isBulkSaving,
   onToggleSelection,
   onUpdateRow,
   onSave,
+  onConfirm,
 }: {
   order: AdminOrder;
   isSelected: boolean;
   isSaving: boolean;
+  isBulkSaving: boolean;
   onToggleSelection: (id: string) => void;
   onUpdateRow: (id: string, patch: Partial<AdminOrder>) => void;
   onSave: (order: AdminOrder) => void;
+  onConfirm: (value: ConfirmState) => void;
 }) {
   const allowedStatuses = getAllowedOrderStatusTransitions({
     status: order.status,
@@ -282,7 +372,7 @@ function OrderRow({
       <div>
         <p className="font-semibold">{order.customerName}</p>
         <p className="text-sm text-black/55">{order.customerEmail}</p>
-        <p className="mt-1 text-xs text-black/45">{order.id}</p>
+        <p className="mt-1 text-xs text-black/45">{formatOrderReference(order.id)}</p>
       </div>
 
       <div className="text-sm">
@@ -293,15 +383,15 @@ function OrderRow({
 
       <div className="text-sm">
         <p className="font-semibold">Pago</p>
-        <p>{order.paymentStatus}</p>
+        <p>{humanizePaymentStatus(order.paymentStatus)}</p>
         {order.paymentExpiresAt ? (
           <p className="text-xs text-black/45">
-            expira {new Date(order.paymentExpiresAt).toLocaleString("es-CO")}
+            vence {new Date(order.paymentExpiresAt).toLocaleString("es-CO")}
           </p>
         ) : null}
         {order.refundedAt ? (
           <p className="text-xs text-black/45">
-            refund {new Date(order.refundedAt).toLocaleString("es-CO")}
+            reembolso {new Date(order.refundedAt).toLocaleString("es-CO")}
           </p>
         ) : null}
       </div>
@@ -315,22 +405,23 @@ function OrderRow({
               status: event.target.value as AdminOrder["status"],
             })
           }
-          className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2"
+          disabled={isSaving || isBulkSaving}
+          className="mt-2 w-full rounded-2xl border border-black/10 bg-white px-3 py-2 disabled:cursor-not-allowed disabled:opacity-60"
         >
           <option value="PENDING" disabled={!allowedStatuses.includes("PENDING")}>
-            PENDING
+            {humanizeOrderStatus("PENDING")}
           </option>
           <option value="PAID" disabled={!allowedStatuses.includes("PAID")}>
-            PAID
+            {humanizeOrderStatus("PAID")}
           </option>
           <option value="PROCESSING" disabled={!allowedStatuses.includes("PROCESSING")}>
-            PROCESSING
+            {humanizeOrderStatus("PROCESSING")}
           </option>
           <option value="FULFILLED" disabled={!allowedStatuses.includes("FULFILLED")}>
-            FULFILLED
+            {humanizeOrderStatus("FULFILLED")}
           </option>
           <option value="CANCELED" disabled={!allowedStatuses.includes("CANCELED")}>
-            CANCELED
+            {humanizeOrderStatus("CANCELED")}
           </option>
         </select>
       </label>
@@ -354,8 +445,16 @@ function OrderRow({
 
       <button
         type="button"
-        onClick={() => onSave(order)}
-        disabled={isSaving}
+        onClick={() =>
+          onConfirm({
+            title: "¿Guardar cambio de estado?",
+            description: `El pedido ${formatOrderReference(order.id)} quedará como ${humanizeOrderStatus(order.status).toLowerCase()}. Verifica que esta actualización sea correcta antes de continuar.`,
+            confirmLabel: "Guardar cambio",
+            tone: order.status === "CANCELED" ? "danger" : "default",
+            run: async () => onSave(order),
+          })
+        }
+        disabled={isSaving || isBulkSaving}
         className="rounded-full bg-ink px-4 py-2 text-sm font-semibold text-white disabled:opacity-60"
       >
         {isSaving ? "Guardando..." : "Guardar"}

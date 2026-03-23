@@ -64,6 +64,28 @@ export async function POST(request: Request) {
       }
     }
 
+    if (event.type === "payment_intent.succeeded") {
+      const paymentIntent = event.data.object as Stripe.PaymentIntent;
+
+      logEvent("INFO", "payments.webhook.payment_intent_succeeded", {
+        requestId,
+        eventType: event.type,
+        orderId: paymentIntent.metadata?.orderId,
+      });
+      await recordOperationalEvent({
+        level: "INFO",
+        scope: "payments.webhook",
+        message: "Stripe payment intent succeeded",
+        requestId,
+        route: "/api/payments/webhook",
+        metadata: {
+          eventType: event.type,
+          orderId: paymentIntent.metadata?.orderId ?? null,
+          paymentIntentId: paymentIntent.id,
+        },
+      });
+    }
+
     logEvent("INFO", "payments.webhook.received", {
       requestId,
       eventType: event.type,

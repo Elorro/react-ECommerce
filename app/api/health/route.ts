@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { alertsAreConfigured } from "@/lib/alerts";
 import { getAvailableAuthProviders } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { getObservabilityMetrics } from "@/lib/observability";
@@ -31,12 +32,21 @@ export async function GET() {
     stripeConfigured: isStripeConfigured(),
     stripeCheckoutEnabled: isStripeCheckoutEnabled(),
     stripeMockEnabled: isStripeMockEnabled(),
+    stripeLiveMode: Boolean(process.env.STRIPE_SECRET_KEY?.startsWith("sk_live_")),
     jobsConfigured: Boolean(process.env.INTERNAL_JOB_SECRET),
+    alertsConfigured: alertsAreConfigured(),
+    sentryConfigured: Boolean(process.env.SENTRY_DSN),
     readiness: {
       productionReady: readiness.productionReady,
       issues: readiness.issues,
       warnings: readiness.warnings,
       cronReconcileUrl: `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL || "http://localhost:3000"}/api/internal/orders/reconcile`,
+      stripeWebhookEvents: [
+        "checkout.session.completed",
+        "checkout.session.expired",
+        "checkout.session.async_payment_failed",
+        "payment_intent.succeeded",
+      ],
     },
     observability: {
       errors24h: metrics.last24Hours.errors,

@@ -290,6 +290,12 @@ export async function createPendingStripeOrder(
         customer_email: context.userEmail,
         success_url: `${baseUrl}/checkout/success?session_id={CHECKOUT_SESSION_ID}&order_id=${order.id}`,
         cancel_url: `${baseUrl}/checkout?payment=cancelled`,
+        payment_intent_data: {
+          metadata: {
+            orderId: order.id,
+            userId: context.userId,
+          },
+        },
         metadata: {
           orderId: order.id,
           userId: context.userId,

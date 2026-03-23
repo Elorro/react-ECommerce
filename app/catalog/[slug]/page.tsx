@@ -1,4 +1,6 @@
+import type { ReactNode } from "react";
 import { notFound } from "next/navigation";
+import { ShieldCheck, Truck, RotateCcw } from "lucide-react";
 import { AddToCartButton } from "@/components/store/add-to-cart-button";
 import { getProductBySlug } from "@/lib/catalog";
 
@@ -17,7 +19,7 @@ export default async function ProductDetailPage({
   return (
     <div className="grid gap-10 lg:grid-cols-[1.05fr_0.95fr]">
       <div
-        className="min-h-[28rem] rounded-[2rem] border border-black/5 bg-cover bg-center shadow-card"
+        className="min-h-[24rem] rounded-[2rem] border border-black/5 bg-cover bg-center shadow-card sm:min-h-[28rem]"
         style={{ backgroundImage: `url(${product.imageUrl})` }}
       />
       <section className="rounded-[2rem] border border-black/5 bg-white/85 p-8 shadow-card">
@@ -39,13 +41,22 @@ export default async function ProductDetailPage({
               <p className="text-lg font-medium">{product.stock} disponibles</p>
             </div>
           </div>
-          <div className="flex flex-wrap gap-3 text-sm font-medium text-black/70">
-            <span className="rounded-full bg-emerald-50 px-4 py-2 text-emerald-800">
-              Compra segura
-            </span>
-            <span className="rounded-full bg-canvas px-4 py-2">
-              Envío y disponibilidad confirmados antes de finalizar
-            </span>
+          <div className="grid gap-3 rounded-[1.5rem] bg-canvas p-5 sm:grid-cols-3">
+            <TrustPill
+              icon={<ShieldCheck className="h-4 w-4" />}
+              title="Pago seguro"
+              description="Tu compra se procesa con protección de datos y validación del pedido."
+            />
+            <TrustPill
+              icon={<Truck className="h-4 w-4" />}
+              title="Envíos seguros"
+              description="Revisamos disponibilidad antes de confirmar la compra."
+            />
+            <TrustPill
+              icon={<RotateCcw className="h-4 w-4" />}
+              title="Devoluciones disponibles"
+              description="Si necesitas seguimiento, encontrarás el detalle desde tu cuenta."
+            />
           </div>
           <AddToCartButton
             product={{
@@ -59,6 +70,24 @@ export default async function ProductDetailPage({
           />
         </div>
       </section>
+    </div>
+  );
+}
+
+function TrustPill({
+  icon,
+  title,
+  description,
+}: {
+  icon: ReactNode;
+  title: string;
+  description: string;
+}) {
+  return (
+    <div className="rounded-[1.25rem] border border-black/5 bg-white px-4 py-4">
+      <div className="inline-flex rounded-full bg-emerald-50 p-2 text-emerald-700">{icon}</div>
+      <p className="mt-3 text-sm font-semibold text-ink">{title}</p>
+      <p className="mt-2 text-sm leading-6 text-black/65">{description}</p>
     </div>
   );
 }

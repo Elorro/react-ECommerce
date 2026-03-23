@@ -23,6 +23,15 @@ function hasOAuthProviderConfigured() {
   );
 }
 
+function hasSecureSecret(value?: string) {
+  return Boolean(value && value.length >= 32);
+}
+
+function isHttpsUrl(value?: string) {
+  const parsed = normalizeUrl(value);
+  return parsed?.protocol === "https:";
+}
+
 export function isLocalAppUrl() {
   const appUrl = normalizeUrl(process.env.NEXT_PUBLIC_APP_URL || process.env.NEXTAUTH_URL);
 
@@ -44,6 +53,9 @@ export function getRuntimeReadiness(): RuntimeReadiness {
   if (!process.env.NEXTAUTH_SECRET) {
     issues.push("NEXTAUTH_SECRET is missing");
   }
+  if (process.env.NEXTAUTH_SECRET && !hasSecureSecret(process.env.NEXTAUTH_SECRET)) {
+    issues.push("NEXTAUTH_SECRET must be at least 32 characters");
+  }
 
   if (!process.env.NEXTAUTH_URL || !authUrl) {
     issues.push("NEXTAUTH_URL is missing or invalid");
@@ -55,6 +67,9 @@ export function getRuntimeReadiness(): RuntimeReadiness {
 
   if (!process.env.INTERNAL_JOB_SECRET) {
     issues.push("INTERNAL_JOB_SECRET is missing");
+  }
+  if (process.env.INTERNAL_JOB_SECRET && !hasSecureSecret(process.env.INTERNAL_JOB_SECRET)) {
+    issues.push("INTERNAL_JOB_SECRET must be at least 32 characters");
   }
 
   if (!databaseUrl) {
@@ -85,12 +100,36 @@ export function getRuntimeReadiness(): RuntimeReadiness {
     issues.push("Production should not run on SQLite");
   }
 
+  if (isProduction && !isHttpsUrl(process.env.NEXTAUTH_URL)) {
+    issues.push("NEXTAUTH_URL must use HTTPS in production");
+  }
+
+  if (isProduction && !isHttpsUrl(process.env.NEXT_PUBLIC_APP_URL)) {
+    issues.push("NEXT_PUBLIC_APP_URL must use HTTPS in production");
+  }
+
+  if (isProduction && process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_")) {
+    issues.push("STRIPE_SECRET_KEY must use a live key in production");
+  }
+
+  if (process.env.STRIPE_WEBHOOK_SECRET && !process.env.STRIPE_WEBHOOK_SECRET.startsWith("whsec_")) {
+    issues.push("STRIPE_WEBHOOK_SECRET must start with whsec_");
+  }
+
   if (isProduction && !process.env.DATABASE_URL_POSTGRES) {
     warnings.push("DATABASE_URL_POSTGRES is missing");
   }
 
   if (!process.env.STRIPE_SECRET_KEY) {
     warnings.push("Stripe is not configured");
+  }
+
+  if (!process.env.SENTRY_DSN) {
+    warnings.push("SENTRY_DSN is missing");
+  }
+
+  if (!process.env.ALERT_WEBHOOK_URL) {
+    warnings.push("ALERT_WEBHOOK_URL is missing");
   }
 
   return {

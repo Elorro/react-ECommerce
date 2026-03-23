@@ -1,3 +1,5 @@
+import { dispatchAlert } from "@/lib/alerts";
+
 type LogLevel = "INFO" | "WARN" | "ERROR";
 
 type LogContext = Record<string, unknown>;
@@ -17,6 +19,17 @@ export function logEvent(level: LogLevel, message: string, context: LogContext =
   const serialized = JSON.stringify(payload);
 
   if (level === "ERROR") {
+    dispatchAlert({
+      level,
+      message,
+      timestamp: payload.timestamp,
+      environment: process.env.NODE_ENV,
+      requestId: typeof context.requestId === "string" ? context.requestId : undefined,
+      route: typeof context.route === "string" ? context.route : undefined,
+      orderId: typeof context.orderId === "string" ? context.orderId : undefined,
+      eventType: typeof context.eventType === "string" ? context.eventType : undefined,
+      error: typeof context.error === "string" ? context.error : undefined,
+    });
     console.error(serialized);
     return;
   }

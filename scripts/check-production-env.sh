@@ -44,6 +44,30 @@ if [[ "${DATABASE_URL:-}" == file:* ]]; then
   missing+=("DATABASE_URL must not point to SQLite in production")
 fi
 
+if [[ -n "${NEXTAUTH_SECRET:-}" && ${#NEXTAUTH_SECRET} -lt 32 ]]; then
+  missing+=("NEXTAUTH_SECRET must be at least 32 characters")
+fi
+
+if [[ -n "${INTERNAL_JOB_SECRET:-}" && ${#INTERNAL_JOB_SECRET} -lt 32 ]]; then
+  missing+=("INTERNAL_JOB_SECRET must be at least 32 characters")
+fi
+
+if [[ -n "${NEXTAUTH_URL:-}" && ! "${NEXTAUTH_URL}" =~ ^https:// ]]; then
+  missing+=("NEXTAUTH_URL must use https in production")
+fi
+
+if [[ -n "${NEXT_PUBLIC_APP_URL:-}" && ! "${NEXT_PUBLIC_APP_URL}" =~ ^https:// ]]; then
+  missing+=("NEXT_PUBLIC_APP_URL must use https in production")
+fi
+
+if [[ -n "${STRIPE_SECRET_KEY:-}" && "${STRIPE_SECRET_KEY}" != sk_live_* ]]; then
+  missing+=("STRIPE_SECRET_KEY must use a live key in production")
+fi
+
+if [[ -n "${STRIPE_WEBHOOK_SECRET:-}" && "${STRIPE_WEBHOOK_SECRET}" != whsec_* ]]; then
+  missing+=("STRIPE_WEBHOOK_SECRET must start with whsec_")
+fi
+
 if [[ -z "${AUTH_GOOGLE_ID:-}${AUTH_GITHUB_ID:-}" ]]; then
   missing+=("At least one OAuth provider pair must be configured")
 fi
@@ -63,3 +87,11 @@ if (( ${#missing[@]} > 0 )); then
 fi
 
 echo "Production environment variables look complete."
+
+if [[ -z "${SENTRY_DSN:-}" ]]; then
+  echo "Warning: SENTRY_DSN is not configured." >&2
+fi
+
+if [[ -z "${ALERT_WEBHOOK_URL:-}" ]]; then
+  echo "Warning: ALERT_WEBHOOK_URL is not configured." >&2
+fi

@@ -23,8 +23,10 @@
     "ops:pg:wait": "bash scripts/pg-wait.sh",
     "ops:pg:backup": "bash scripts/pg-backup.sh",
     "ops:pg:restore": "bash scripts/pg-restore.sh",
+    "ops:pg:restore:verify": "bash scripts/pg-restore-verify.sh",
     "ops:check:env": "bash scripts/check-production-env.sh",
-    "ops:orders:reconcile": "bash scripts/reconcile-orders.sh"
+    "ops:orders:reconcile": "bash scripts/reconcile-orders.sh",
+    "ops:smoke": "bash scripts/production-smoke.sh"
   },
   "overrides": {
     "effect": "3.20.0"

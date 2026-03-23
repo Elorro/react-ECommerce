@@ -20,7 +20,7 @@ export function CheckoutForm({
 }) {
   const router = useRouter();
   const { data: session } = useSession();
-  const { items, totalAmount, clearCart, isReady, isSyncing, source } = useCart();
+  const { items, totalAmount, clearCart, isReady, isSyncing } = useCart();
   const { pushToast } = useToast();
   const [serverError, setServerError] = useState<string | null>(null);
   const [isRedirectingToPayment, setIsRedirectingToPayment] = useState(false);
@@ -214,7 +214,7 @@ export function CheckoutForm({
               Pago seguro procesado por Stripe
             </span>
             <span className="rounded-full bg-canvas px-4 py-2 text-black/75">
-              Tus datos están protegidos
+              Protección de datos garantizada
             </span>
           </div>
         </div>

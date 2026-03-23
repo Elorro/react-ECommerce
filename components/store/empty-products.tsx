@@ -10,7 +10,7 @@ export function EmptyProducts() {
       </p>
       <Link
         href="/catalog"
-        className="mt-6 inline-flex rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white"
+        className="mt-6 inline-flex rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
       >
         Ver todo el catálogo
       </Link>

@@ -53,7 +53,15 @@ export default async function AccountPage() {
             ))}
           </div>
         ) : (
-          <p className="text-black/65">Aún no tienes compras registradas.</p>
+          <div className="space-y-4 rounded-3xl border border-dashed border-black/10 bg-canvas px-5 py-6">
+            <p className="text-black/65">Aún no tienes compras registradas.</p>
+            <Link
+              href="/catalog"
+              className="inline-flex rounded-full bg-ink px-5 py-3 text-sm font-semibold text-white transition hover:bg-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2"
+            >
+              Explorar productos
+            </Link>
+          </div>
         )}
       </div>
     </section>

@@ -6,6 +6,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useSession } from "next-auth/react";
 import { useCart } from "@/components/store/cart-provider";
+import { InlineNotice } from "@/components/ui/inline-notice";
+import { Skeleton } from "@/components/ui/skeleton";
+import { useToast } from "@/components/ui/toast-provider";
 import { clientCheckoutSchema, type ClientCheckoutValues } from "@/lib/validators/order";
 
 export function CheckoutForm({
@@ -18,8 +21,39 @@ export function CheckoutForm({
   const router = useRouter();
   const { data: session } = useSession();
   const { items, totalAmount, clearCart, isReady, isSyncing, source } = useCart();
+  const { pushToast } = useToast();
   const [serverError, setServerError] = useState<string | null>(null);
   const [isRedirectingToPayment, setIsRedirectingToPayment] = useState(false);
+
+  const redirectToSignIn = () => {
+    pushToast({
+      tone: "error",
+      message: "Tu sesión expiró. Inicia sesión nuevamente para continuar con tu compra.",
+    });
+    router.push("/auth/sign-in?callbackUrl=/checkout");
+  };
+
+  const humanizeCheckoutError = (message?: string) => {
+    if (!message) {
+      return "No pudimos continuar con tu compra. Intenta nuevamente en unos segundos.";
+    }
+
+    const normalized = message.toLowerCase();
+
+    if (normalized.includes("insufficient stock")) {
+      return "Algunos productos ya no tienen la cantidad disponible que elegiste. Revisa tu carrito e inténtalo de nuevo.";
+    }
+
+    if (normalized.includes("product not found")) {
+      return "Uno de los productos ya no está disponible. Actualiza tu carrito para continuar.";
+    }
+
+    if (normalized.includes("unauthorized") || normalized.includes("forbidden")) {
+      return "Tu sesión expiró. Inicia sesión nuevamente para continuar.";
+    }
+
+    return "No pudimos procesar tu solicitud. Revisa tus datos e inténtalo nuevamente.";
+  };
 
   const form = useForm<ClientCheckoutValues>({
     resolver: zodResolver(clientCheckoutSchema),
@@ -31,69 +65,110 @@ export function CheckoutForm({
 
   const onSubmit = form.handleSubmit(async (values) => {
     setServerError(null);
+    try {
+      const response = await fetch("/api/orders", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...values,
+          items: items.map((item) => ({
+            productId: item.id,
+            quantity: item.quantity,
+          })),
+        }),
+      });
 
-    const response = await fetch("/api/orders", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        ...values,
-        items: items.map((item) => ({
-          productId: item.id,
-          quantity: item.quantity,
-        })),
-      }),
-    });
+      if (response.status === 401) {
+        redirectToSignIn();
+        return;
+      }
 
-    const data = (await response.json()) as { error?: string; orderId?: string };
+      const data = (await response.json()) as { error?: string; orderId?: string };
 
-    if (!response.ok || !data.orderId) {
-      setServerError(data.error ?? "No se pudo crear la orden.");
-      return;
+      if (!response.ok || !data.orderId) {
+        setServerError(humanizeCheckoutError(data.error));
+        return;
+      }
+
+      pushToast({
+        tone: "success",
+        message: "Tu pedido fue creado correctamente.",
+      });
+      clearCart();
+      router.push(`/orders/${data.orderId}`);
+    } catch {
+      setServerError("No pudimos procesar tu pedido por un problema de conexión. Intenta nuevamente.");
     }
-
-    clearCart();
-    router.push(`/orders/${data.orderId}`);
   });
 
   const onPayWithStripe = form.handleSubmit(async (values) => {
     setServerError(null);
     setIsRedirectingToPayment(true);
+    try {
+      const response = await fetch("/api/payments/checkout-session", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          ...values,
+          items: items.map((item) => ({
+            productId: item.id,
+            quantity: item.quantity,
+          })),
+        }),
+      });
 
-    const response = await fetch("/api/payments/checkout-session", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        ...values,
-        items: items.map((item) => ({
-          productId: item.id,
-          quantity: item.quantity,
-        })),
-      }),
-    });
+      if (response.status === 401) {
+        setIsRedirectingToPayment(false);
+        redirectToSignIn();
+        return;
+      }
 
-    const data = (await response.json()) as { error?: string; checkoutUrl?: string };
+      const data = (await response.json()) as { error?: string; checkoutUrl?: string };
 
-    if (!response.ok || !data.checkoutUrl) {
+      if (!response.ok || !data.checkoutUrl) {
+        setIsRedirectingToPayment(false);
+        setServerError(
+          humanizeCheckoutError(data.error) ||
+            "No pudimos procesar tu pago. Intenta nuevamente o usa otro método.",
+        );
+        return;
+      }
+
+      router.push(data.checkoutUrl);
+    } catch {
       setIsRedirectingToPayment(false);
-      setServerError(data.error ?? "No se pudo iniciar el pago.");
-      return;
+      setServerError(
+        "No pudimos iniciar el pago por un problema de conexión. Revisa tu red e inténtalo de nuevo.",
+      );
     }
-
-    router.push(data.checkoutUrl);
   });
 
   if (!isReady) {
     return (
-      <section className="rounded-[2rem] border border-black/5 bg-white/85 p-8 shadow-card">
-        <h1 className="font-display text-4xl">Preparando tu compra</h1>
-        <p className="mt-3 max-w-xl text-black/70">
-          Estamos cargando tu carrito {source === "user" ? "desde tu cuenta" : "desde este navegador"} para que puedas revisar tu pedido.
-        </p>
-      </section>
+      <div className="grid gap-8 lg:grid-cols-[1fr_0.8fr]">
+        <section className="space-y-5 rounded-[2rem] border border-black/5 bg-white/85 p-8 shadow-card">
+          <div className="space-y-3">
+            <Skeleton className="h-4 w-24" />
+            <Skeleton className="h-12 w-64" />
+            <Skeleton className="h-5 w-full max-w-xl" />
+          </div>
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-16 w-full" />
+          <Skeleton className="h-32 w-full" />
+          <Skeleton className="h-12 w-full" />
+        </section>
+        <aside className="space-y-4 rounded-[2rem] border border-black/5 bg-pine p-8 text-white shadow-card">
+          <Skeleton className="h-10 w-48 bg-white/15" />
+          <Skeleton className="h-5 w-full bg-white/10" />
+          {Array.from({ length: 2 }).map((_, index) => (
+            <Skeleton key={index} className="h-16 w-full bg-white/10" />
+          ))}
+        </aside>
+      </div>
     );
   }
 
@@ -159,19 +234,19 @@ export function CheckoutForm({
         />
 
         {serverError ? (
-          <p className="rounded-2xl bg-brand/10 px-4 py-3 text-sm font-medium text-brand">
+          <InlineNotice tone="error">
             {serverError}
-          </p>
+          </InlineNotice>
         ) : null}
         {paymentCancelled ? (
-          <p className="rounded-2xl bg-amber-100 px-4 py-3 text-sm font-medium text-amber-900">
+          <InlineNotice tone="warn">
             El pago no se completó. Tu carrito sigue intacto para que puedas intentarlo de nuevo cuando quieras.
-          </p>
+          </InlineNotice>
         ) : null}
         {isSyncing ? (
-          <p className="rounded-2xl bg-canvas px-4 py-3 text-sm font-medium text-black/70">
+          <InlineNotice tone="info">
             Estamos actualizando tu carrito antes de continuar.
-          </p>
+          </InlineNotice>
         ) : null}
 
         {stripeEnabled ? (
@@ -181,7 +256,7 @@ export function CheckoutForm({
             disabled={form.formState.isSubmitting || isSyncing || isRedirectingToPayment}
             className="inline-flex w-full items-center justify-center rounded-full bg-ink px-6 py-3 text-sm font-semibold text-white transition hover:bg-brand focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            {isRedirectingToPayment ? "Redirigiendo al pago..." : "Ir a pago seguro"}
+            {isRedirectingToPayment ? "Procesando pago..." : "Ir a pago seguro"}
           </button>
         ) : null}
         <button

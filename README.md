@@ -1,187 +1,436 @@
-# Atelier Commerce
+# 🧾 Atelier Commerce
 
-Base full-stack para un e-commerce moderno con `Next.js`, `TypeScript`, `Tailwind`, `Prisma`, `NextAuth`, `Stripe`, validación con `Zod` y testing con `Vitest`.
+Atelier Commerce es un e-commerce fullstack construido con `Next.js`, `TypeScript`, `Prisma`, `PostgreSQL`, `NextAuth` y `Stripe`.
 
-## Stack actual
+Está pensado como una base profesional para una tienda online moderna: catálogo, carrito, checkout, órdenes, panel administrativo, autenticación delegada y despliegue en Vercel.
 
-- Frontend y backend: Next.js App Router
-- Tipado: TypeScript estricto
-- Datos: Prisma
-- Base de datos activa: PostgreSQL
-- SQLite quedó relegado a la etapa anterior y ya no es la ruta principal
-- Auth delegada: NextAuth con Google y GitHub
-- Pagos: Stripe Checkout + webhook
-- Validación y sanitización: Zod + sanitize-html
+## 🚀 Features principales
 
-## Scripts
+- Autenticación con OAuth usando `NextAuth`
+- Roles de usuario (`CUSTOMER`, `OPERATIONS`, `ADMIN`)
+- Catálogo de productos y categorías
+- Carrito híbrido:
+  - anónimo en navegador
+  - persistente para usuarios autenticados
+- Checkout con `Stripe Checkout`
+- Webhooks de Stripe para confirmación y trazabilidad
+- Gestión de órdenes
+- Reembolsos y devoluciones desde panel interno
+- Panel admin para productos, categorías y órdenes
+- Base de datos con `Prisma` sobre `PostgreSQL`
+- Preparado para despliegue en `Vercel`
+- Testing unitario/integración y E2E
 
-- `npm run dev`: entorno local
-- `npm run build`: build de producción
-- `npm run start`: servir build
-- `npm run lint`: ESLint CLI
-- `npm run typecheck`: chequeo estricto de tipos
-- `npm run test`: tests
-- `npm run db:generate`: generar cliente Prisma para SQLite
-- `npm run db:push`: sincronizar esquema PostgreSQL activa
-- `npm run db:migrate`: crear/aplicar migraciones sobre PostgreSQL activa
-- `npm run db:seed`: poblar catálogo local sobre PostgreSQL
-- `npm run db:generate:pg`: generar cliente Prisma usando esquema PostgreSQL
-- `npm run db:push:pg`: sincronizar esquema PostgreSQL
-- `npm run db:migrate:pg`: migraciones dev sobre PostgreSQL
-- `npm run db:seed:pg`: poblar PostgreSQL
-- `GET /api/readiness`: readiness estricto para despliegue y probes
+## 🏗️ Arquitectura
 
-## Variables de entorno
+### Stack
 
-Copia `.env.example` a `.env` y completa:
+- Frontend: `Next.js 16` con `App Router`
+- Backend: Route Handlers en `app/api/*`
+- Base de datos: `PostgreSQL` (Neon en producción) + `Prisma`
+- Auth: `NextAuth` con OAuth
+- Pagos: `Stripe Checkout` + webhooks
+- Estilos: `Tailwind CSS`
+- Hosting: `Vercel`
+- Testing: `Vitest` + `Playwright`
 
-- `DATABASE_URL`: SQLite local por defecto
-- `DATABASE_URL`: PostgreSQL activo del proyecto
-- `.env.production.example`: base recomendada para producción real
-- `NEXTAUTH_SECRET`: secreto real
-- `NEXTAUTH_URL`: URL base de la app
-- `AUTH_GOOGLE_ID` y `AUTH_GOOGLE_SECRET`: OAuth Google
-- `ADMIN_EMAILS`: correos con rol admin separados por coma
-- `STRIPE_SECRET_KEY`: clave privada Stripe
-- `STRIPE_WEBHOOK_SECRET`: firma del webhook
-- `INTERNAL_JOB_SECRET`: token bearer para el endpoint interno de reconciliación
-- `NEXT_PUBLIC_APP_URL`: URL pública usada por Stripe
-- `SENTRY_DSN`: captura opcional de errores en producción
-- `ALERT_WEBHOOK_URL`: webhook opcional para alertas críticas
+### Cómo interactúan los componentes
+
+1. El usuario navega catálogo y detalle de producto desde `app/`.
+2. El carrito se gestiona desde cliente, pero las validaciones críticas viven en servidor.
+3. El checkout crea una orden pendiente en base de datos y genera una sesión de Stripe.
+4. Stripe redirige al usuario y además notifica por webhook.
+5. El backend confirma el pago, actualiza el estado de la orden y registra eventos operativos.
+6. Los usuarios autenticados consultan sus órdenes desde la cuenta.
+7. Los usuarios `ADMIN` y `OPERATIONS` operan órdenes desde el panel interno.
+
+## 🧩 Estructura del proyecto
+
+```text
+.
+├── app/
+│   ├── admin/
+│   ├── api/
+│   ├── auth/
+│   ├── cart/
+│   ├── catalog/
+│   ├── checkout/
+│   ├── orders/
+│   ├── account/
+│   ├── layout.tsx
+│   └── page.tsx
+├── components/
+│   ├── admin/
+│   ├── auth/
+│   ├── layout/
+│   ├── store/
+│   └── ui/
+├── lib/
+│   ├── validators/
+│   ├── auth.ts
+│   ├── cart.ts
+│   ├── catalog.ts
+│   ├── db.ts
+│   ├── logger.ts
+│   ├── observability.ts
+│   ├── order-status.ts
+│   ├── orders.ts
+│   ├── payments.ts
+│   ├── permissions.ts
+│   └── runtime-config.ts
+├── prisma/
+│   ├── migrations/
+│   ├── schema.prisma
+│   ├── schema.postgres.prisma
+│   └── seed.ts
+├── public/
+├── scripts/
+├── tests/
+├── e2e/
+├── package.json
+└── next.config.ts
+```
+
+### Directorios clave
+
+#### `/app`
+
+Contiene las pantallas, layouts y Route Handlers del proyecto.
+
+- rutas públicas: home, catálogo, carrito, checkout
+- rutas autenticadas: cuenta, órdenes
+- rutas administrativas: `/admin/*`
+- API interna: `/api/*`
+
+#### `/components`
+
+Componentes reutilizables de UI y composición.
+
+- `store/`: catálogo, carrito, checkout
+- `admin/`: tablas, soporte de órdenes, paneles internos
+- `auth/`: login, estado de sesión
+- `layout/`: header, footer
+- `ui/`: componentes base como notices, dialogs, skeletons, toasts
+
+#### `/lib`
+
+Lógica de dominio y servicios del sistema.
+
+- acceso a base de datos
+- auth y permisos
+- pagos
+- lifecycle de órdenes
+- observabilidad
+- validaciones
+
+#### `/prisma`
+
+Fuente de verdad del modelo de datos.
+
+- esquema principal
+- migraciones
+- seed de desarrollo
+
+#### `/app/api`
+
+Endpoints server-side del sistema:
+
+- auth
+- carrito
+- órdenes
+- checkout con Stripe
+- webhooks
+- reconciliación
+- admin
+
+## ⚙️ Configuración del entorno
+
+### Variables de entorno necesarias
+
+Usa `.env.example` o `.env.production.example` como referencia.
+
+```env
+DATABASE_URL="postgresql://USER:PASSWORD@HOST:5432/DB_NAME?schema=public"
+DATABASE_URL_POSTGRES="postgresql://USER:PASSWORD@HOST:5432/DB_NAME?schema=public"
+
+NEXTAUTH_URL="https://tu-dominio.com"
+NEXTAUTH_SECRET="tu-secreto-largo-y-seguro"
+NEXT_PUBLIC_APP_URL="https://tu-dominio.com"
+
+AUTH_GOOGLE_ID="google-oauth-client-id"
+AUTH_GOOGLE_SECRET="google-oauth-client-secret"
+AUTH_GITHUB_ID="github-oauth-client-id"
+AUTH_GITHUB_SECRET="github-oauth-client-secret"
+
+ADMIN_EMAILS="admin@tu-dominio.com"
+OPERATIONS_EMAILS="ops@tu-dominio.com"
+
+STRIPE_SECRET_KEY="sk_live_o_sk_test"
+STRIPE_WEBHOOK_SECRET="whsec_xxx"
+
+INTERNAL_JOB_SECRET="token-largo-para-jobs-internos"
+
+SENTRY_DSN=""
+ALERT_WEBHOOK_URL=""
+ALERT_WEBHOOK_BEARER_TOKEN=""
+
+E2E_TEST_SECRET=""
+```
+
+### Qué hace cada variable
+
+- `DATABASE_URL`: conexión principal a PostgreSQL
+- `DATABASE_URL_POSTGRES`: conexión explícita usada en validaciones/runtime checks
+- `NEXTAUTH_URL`: URL base usada por NextAuth
+- `NEXTAUTH_SECRET`: firma segura para sesiones y tokens
+- `NEXT_PUBLIC_APP_URL`: URL pública usada por frontend y Stripe
+- `AUTH_GOOGLE_*`: credenciales OAuth de Google
+- `AUTH_GITHUB_*`: credenciales OAuth de GitHub
+- `ADMIN_EMAILS`: correos que reciben rol `ADMIN`
+- `OPERATIONS_EMAILS`: correos que reciben rol `OPERATIONS`
+- `STRIPE_SECRET_KEY`: clave privada de Stripe
+- `STRIPE_WEBHOOK_SECRET`: firma del webhook de Stripe
+- `INTERNAL_JOB_SECRET`: token requerido para reconciliación interna
+- `SENTRY_DSN`: captura de errores en producción
+- `ALERT_WEBHOOK_URL`: webhook opcional para alertas operativas
 - `ALERT_WEBHOOK_BEARER_TOKEN`: bearer opcional para el webhook de alertas
+- `E2E_TEST_SECRET`: secreto para helpers de test end-to-end
 
-## Auth
+## 🗄️ Base de datos
 
-No hay formulario manual de registro. El flujo es deliberado:
+El proyecto usa `Prisma` como ORM y `PostgreSQL` como base principal.
 
-- el usuario entra con OAuth;
-- la cuenta se crea automáticamente en el primer acceso;
-- en accesos siguientes solo inicia sesión.
+### Prisma
 
-Eso reduce superficie de ataque y evita gestionar contraseñas propias.
+Archivos principales:
 
-## Admin
+- [schema.prisma](/home/elorro/Projects/react-ECommerce/prisma/schema.prisma)
+- [schema.postgres.prisma](/home/elorro/Projects/react-ECommerce/prisma/schema.postgres.prisma)
+- [seed.ts](/home/elorro/Projects/react-ECommerce/prisma/seed.ts)
 
-Los accesos admin solo aparecen para usuarios autenticados con rol `ADMIN`.
+### Migraciones
 
-Rutas principales:
+Desarrollo:
 
-- `/admin/products`
-- `/admin/categories`
-- `/admin/orders`
+```bash
+npm run db:migrate
+```
 
-## Soporte operativo
+Producción:
 
-- `/orders/[id]` ahora incluye timeline operativo del pedido
-- `/admin/observability` agrupa errores y muestra auditoría admin reciente
-- `GET /api/admin/export/orders` exporta timestamps operativos, estado de pago y dirección
-- `GET /api/admin/export/logs?orderId=<id>` permite exportar eventos de una orden concreta
+```bash
+npx prisma migrate deploy
+```
 
-## Pagos y reconciliación
+### Seed
 
-El checkout con Stripe crea una orden pendiente y la confirma por dos vías:
+El seed carga categorías y productos base.
 
-- retorno del checkout en `/checkout/success`
-- webhook `POST /api/payments/webhook`
+```bash
+npm run db:seed
+```
 
-Eventos de Stripe esperados en producción:
+## 🔐 Autenticación y roles
+
+### Cómo funciona NextAuth
+
+La autenticación está delegada a proveedores OAuth.
+
+Flujo:
+
+1. el usuario inicia sesión con Google o GitHub
+2. si es la primera vez, se crea su cuenta automáticamente
+3. en ingresos posteriores se reutiliza la cuenta existente
+
+No existe registro manual por formulario ni manejo propio de contraseñas.
+
+### Roles
+
+El sistema trabaja con estos roles:
+
+- `CUSTOMER`: compra y consulta sus órdenes
+- `OPERATIONS`: opera órdenes y soporte
+- `ADMIN`: acceso total a panel administrativo
+
+### Cómo se determina admin vs user
+
+El rol se deriva principalmente del correo autenticado:
+
+- si el correo está en `ADMIN_EMAILS` -> `ADMIN`
+- si el correo está en `OPERATIONS_EMAILS` -> `OPERATIONS`
+- si no, queda como `CUSTOMER`
+
+### Cómo configurar un usuario admin
+
+Ejemplo:
+
+```env
+ADMIN_EMAILS="admin@tu-dominio.com,otra-admin@tu-dominio.com"
+```
+
+## 💳 Pagos con Stripe
+
+### Flujo de pago
+
+1. el usuario inicia checkout
+2. el backend crea una orden pendiente
+3. el backend crea una sesión de `Stripe Checkout`
+4. el usuario paga en Stripe
+5. Stripe redirige de vuelta a la app
+6. Stripe también dispara un webhook
+7. el backend confirma el pago y actualiza la orden
+
+### Eventos relevantes
 
 - `checkout.session.completed`
 - `checkout.session.expired`
 - `checkout.session.async_payment_failed`
 - `payment_intent.succeeded`
 
-`payment_intent.succeeded` queda registrado para trazabilidad operativa. La confirmación comercial del pedido sigue apoyándose en `checkout.session.completed`.
+### Test vs producción
 
-Además existe un endpoint interno para expirar órdenes pendientes vencidas:
+- `sk_test_*`: entorno de pruebas
+- `sk_live_*`: producción real
 
-- `POST /api/internal/orders/reconcile`
-- Header requerido: `Authorization: Bearer <INTERNAL_JOB_SECRET>`
+Nunca mezcles secretos test y live con dominios productivos.
 
-Ese endpoint está pensado para un cron externo.
+## 🔔 Webhooks
 
-## PostgreSQL local y producción
+### Endpoint
 
-Scripts operativos añadidos:
+El proyecto usa:
 
-- `npm run ops:pg:wait`: espera a que Postgres acepte conexiones
-- `npm run ops:pg:backup`: genera backup `.dump`
-- `npm run ops:pg:restore -- <archivo>`: restaura un backup
-- `npm run ops:pg:restore:verify -- <archivo>`: restaura el dump en una base temporal y valida que sea utilizable
-- `npm run ops:check:env`: valida variables mínimas de producción
-- `npm run ops:orders:reconcile`: ejecuta manualmente la reconciliación de órdenes pendientes
-- `npm run ops:smoke`: ejecuta smoke checks básicos contra health, readiness y reconciliación
+```text
+/api/payments/webhook
+```
 
-Setup local activo:
+### Cómo configurarlo en Stripe
 
-1. levanta Postgres con `docker compose up -d`
-2. espera salud con `npm run ops:pg:wait`
-3. verifica que `DATABASE_URL` apunte al valor PostgreSQL
-4. ejecuta `npm run db:generate`
-5. ejecuta `npm run db:migrate`
-6. ejecuta `npm run db:seed`
+1. entra al dashboard de Stripe
+2. crea un webhook apuntando a:
 
-Runbook mínimo de despliegue:
+```text
+https://tu-dominio.com/api/payments/webhook
+```
 
-1. valida env con `npm run ops:check:env`
-2. genera backup con `npm run ops:pg:backup`
-3. valida el backup con `npm run ops:pg:restore:verify -- .backups/<archivo>.dump`
-4. aplica `npm run db:generate`
-5. aplica `npm run db:migrate`
-6. construye con `npm run build`
-7. verifica `GET /api/health` y `GET /api/readiness`
-8. ejecuta `npm run ops:smoke`
-9. si algo falla, restaura con `npm run ops:pg:restore -- .backups/<archivo>.dump`
+3. selecciona los eventos necesarios:
+   - `checkout.session.completed`
+   - `checkout.session.expired`
+   - `checkout.session.async_payment_failed`
+   - `payment_intent.succeeded`
 
-Cron mínimo recomendado:
+4. copia el signing secret y guárdalo como:
 
-- ejecuta `npm run ops:orders:reconcile` cada 5 minutos
-- ese script llama `POST /api/internal/orders/reconcile`
-- necesita `INTERNAL_JOB_SECRET` y `NEXT_PUBLIC_APP_URL` o `NEXTAUTH_URL`
+```env
+STRIPE_WEBHOOK_SECRET="whsec_xxx"
+```
 
-La respuesta de `GET /api/health` también expone un bloque `readiness` con variables faltantes y la URL esperada del job interno.
+## 🧪 Testing
 
-Los scripts `ops:pg:*` usan binarios locales de PostgreSQL si existen. Si no, hacen fallback al contenedor `atelier-commerce-postgres` por `docker exec`, que es la ruta local recomendada en este repo.
+### Qué tests existen
 
-`GET /api/readiness` devuelve `503` cuando la app no está lista para producción. En particular falla si:
+- unit tests con `Vitest`
+- integration tests para rutas y lógica de dominio
+- E2E con `Playwright`
 
-- falta un secreto o URL crítica
-- no hay ningún proveedor OAuth configurado
-- `DATABASE_URL` sigue apuntando a SQLite
-- Stripe está incompleto
-- `NEXTAUTH_URL` y `NEXT_PUBLIC_APP_URL` no coinciden
-- `E2E_STRIPE_MODE=mock` sigue activo fuera de entorno local
-- `NEXTAUTH_SECRET` o `INTERNAL_JOB_SECRET` son débiles
-- las URLs públicas no usan HTTPS
-- Stripe usa una clave `sk_test_` en un entorno `production`
+### Cómo ejecutarlos
 
-## Monitoreo y alertas
+```bash
+npm run lint
+npm run typecheck
+npm run test
+npm run build
+npm run e2e
+```
 
-El repo ya deja preparada esta base operativa:
+## 🚀 Deploy
 
-- logs estructurados con `requestId`
-- observabilidad persistida en base de datos
-- alertas opcionales por webhook cuando ocurre un error crítico (`ALERT_WEBHOOK_URL`)
-- preparación para Sentry a través de `SENTRY_DSN`
+### Cómo desplegar en Vercel
 
-Qué debes activar en un entorno real:
+1. conecta el repo en Vercel
+2. configura las variables de entorno del proyecto
+3. asegúrate de usar PostgreSQL real (Neon en producción)
+4. configura OAuth con el dominio real
+5. configura Stripe con el dominio real y webhook real
 
-1. un error tracker externo como Sentry
-2. un webhook de alertas para checkout, webhook de Stripe y reconciliación
-3. probes externos a `/api/health` y `/api/readiness`
+### Variables en Vercel
 
-## Smoke test real recomendado
+Carga al menos:
 
-Antes de abrir tráfico real:
+- `DATABASE_URL`
+- `DATABASE_URL_POSTGRES`
+- `NEXTAUTH_URL`
+- `NEXTAUTH_SECRET`
+- `NEXT_PUBLIC_APP_URL`
+- `AUTH_GOOGLE_ID`
+- `AUTH_GOOGLE_SECRET`
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- `INTERNAL_JOB_SECRET`
 
-1. login con OAuth real
-2. navegación de catálogo y PDP
-3. agregar productos al carrito
-4. checkout con Stripe
-5. verificación de creación de orden en base de datos
-6. revisión del detalle de orden
-7. refund desde admin
-8. return desde admin
-9. ejecución manual del job `ops:orders:reconcile`
+### Consideraciones importantes
 
-El proyecto ya usa PostgreSQL como datasource principal.
+- `GET /api/readiness` devuelve `503` si el entorno no está listo
+- `ops:check:env` valida configuración mínima
+- producción exige HTTPS y secretos fuertes
+
+## 🛠️ Desarrollo local
+
+### Pasos
+
+```bash
+npm install
+cp .env.example .env
+docker compose up -d
+npm run ops:pg:wait
+npm run db:generate
+npm run db:migrate
+npm run db:seed
+npm run dev
+```
+
+La app quedará disponible en:
+
+```text
+http://localhost:3000
+```
+
+## ⚠️ Consideraciones importantes
+
+- El proyecto usa `overrides` en `package.json` para fijar dependencias transitivas vulnerables sin romper el stack.
+- `vite` existe solo en tooling de desarrollo/test, no como runtime productivo del e-commerce.
+- Stripe puede operar en modo test o live, pero el entorno productivo debe usar claves `live`.
+- El sistema incluye validaciones de readiness para evitar despliegues inseguros.
+- Los scripts operativos de PostgreSQL soportan fallback al contenedor Docker local.
+
+## 📌 Roadmap / mejoras futuras
+
+- integración formal con Sentry
+- alerting más completo y externo
+- dashboards de observabilidad más ricos
+- más cobertura E2E para flujos administrativos
+- mejoras adicionales de UX comercial
+- mayor automatización de despliegue y smoke tests
+
+## 📄 Scripts útiles
+
+```bash
+npm run dev
+npm run build
+npm run start
+npm run lint
+npm run typecheck
+npm run test
+npm run e2e
+
+npm run db:generate
+npm run db:migrate
+npm run db:seed
+
+npm run ops:check:env
+npm run ops:pg:backup
+npm run ops:pg:restore -- <archivo>
+npm run ops:pg:restore:verify -- <archivo>
+npm run ops:orders:reconcile
+npm run ops:smoke
+```

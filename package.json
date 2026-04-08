@@ -29,7 +29,26 @@
     "ops:smoke": "bash scripts/production-smoke.sh"
   },
   "overrides": {
-    "effect": "3.20.0"
+    "effect": "3.20.0",
+    "defu": "6.1.5",
+    "micromatch": {
+      "picomatch": "2.3.2"
+    },
+    "vite": {
+      "picomatch": "4.0.4"
+    },
+    "vitest": {
+      "picomatch": "4.0.4"
+    },
+    "tinyglobby": {
+      "picomatch": "4.0.4"
+    },
+    "minimatch@3.1.5": {
+      "brace-expansion": "1.1.13"
+    },
+    "minimatch@10.2.4": {
+      "brace-expansion": "5.0.5"
+    }
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
@@ -67,6 +86,7 @@
     "tailwindcss": "^3.4.17",
     "tsx": "^4.19.2",
     "typescript": "^5.7.2",
+    "vite": "^7.3.2",
     "vitest": "^3.2.4"
   }
 }
